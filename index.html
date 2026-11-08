@@ -554,7 +554,7 @@ function gDebts(g){
   return out;
 }
 /* ---------- nube (Supabase) ---------- */
-var SB_URL='',SB_KEY='';   /* pega aquí la URL y la anon key de tu proyecto de Supabase */
+var SB_URL='https://supabase.com/dashboard/project/jvytaiwnyjyvxjpjhcce',SB_KEY='sb_publishable_0L2c8fZN37Em5oVgqmy9Ww_PcePVLil';   /* pega aquí la URL y la anon key de tu proyecto de Supabase */
 var sb=(SB_URL&&SB_KEY&&window.supabase)?window.supabase.createClient(SB_URL,SB_KEY):null;
 var cloud={user:null,groups:[],err:''};
 function CL(){return !!(sb&&cloud.user);}
