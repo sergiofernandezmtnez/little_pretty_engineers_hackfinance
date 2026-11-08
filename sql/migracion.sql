@@ -15,7 +15,7 @@ alter table perfiles add constraint perfiles_modo_check check (modo in ('normal'
 -- 2) Permisos básicos (Supabase ya los pone por defecto; esto asegura que no falten)
 grant usage on schema public to anon, authenticated;
 grant all on all tables in schema public to authenticated;
-grant select on ayudas, retos to anon, authenticated;
+grant select on ayudas to anon, authenticated;
 grant execute on all functions in schema public to authenticated;
 
 -- 3) Función de pertenencia a grupos y alta por código
