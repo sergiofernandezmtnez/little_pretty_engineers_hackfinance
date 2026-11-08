@@ -176,6 +176,8 @@ svg.ch .tx.b{fill:var(--ink);font-weight:600}
 .num.ok,.num.pos{color:var(--ok)}.num.warn{color:var(--warn)}.num.neg{color:var(--bad)}
 .qa-row.inc{grid-template-columns:minmax(0,110px) minmax(0,1.1fr) minmax(0,1.6fr) auto}
 @media (max-width:760px){.qa-row.inc{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}}
+.flow{column-count:2;column-gap:20px}.flow>*{break-inside:avoid;margin:0 0 20px}
+@media (max-width:900px){.flow{column-count:1}}
 .mv-tabs{display:flex;gap:6px}
 .chip.inc[aria-pressed=true]{background:var(--ok);border-color:var(--ok);color:var(--on-bad)}
 .list .inc{color:var(--ok)}
@@ -412,7 +414,7 @@ var SUG=['¿Cuánto puedo gastar hoy?','¿Puedo gastarme 35 € en unas zapatill
 /* ---------- estado ---------- */
 var KEY='finmes.v1';
 var mem=null;
-function defaults(){return {profile:null,mode:'normal',groups:[],gastos:[],saved:[],discarded:[],hist:[],joined:{},events:[],plans:{},card:{blocked:false,auto:true,alertDaily:true,alertPct:true},chat:[],sim:null,ingExtra:[],lastDigest:'',example:false,flags:{},closed:{},alerts:{mes:'',hit:[]},modeMonth:''};}
+function defaults(){return {profile:null,mode:'normal',groups:[],gastos:[],saved:[],discarded:[],hist:[],joined:{},events:[],plans:{},card:{blocked:false,auto:true,alertDaily:true,alertPct:true},chat:[],sim:null,ingExtra:[],myRetos:[],retoHist:[],lastDigest:'',example:false,flags:{},closed:{},alerts:{mes:'',hit:[]},modeMonth:''};}
 function load(){try{var r=localStorage.getItem(KEY);if(r)return JSON.parse(r);}catch(e){}return mem;}
 var curMes=function(){var t=new Date();return t.getFullYear()+'-'+pad(t.getMonth()+1);};
 var nextMes=function(k){var a=k.split('-').map(Number);a[1]++;if(a[1]>12){a[1]=1;a[0]++;}return a[0]+'-'+pad(a[1]);};
@@ -422,6 +424,8 @@ function fixState(){
   if(!MODES[S.mode])S.mode='normal';
   if(!S.groups)S.groups=[];
   if(!S.ingExtra)S.ingExtra=[];
+  if(!S.myRetos)S.myRetos=[];
+  if(!S.retoHist)S.retoHist=[];
   if(!S.closed)S.closed={};
   if(!S.alerts)S.alerts={mes:'',hit:[]};
   S.chat=(S.chat||[]).filter(function(m){return !m.pending;});
@@ -565,7 +569,32 @@ function retoStats(id){
   while(set[ymd(d)]){streak++;d=addDays(d,-1);}
   return {days:days,streak:streak,done:days>=r.dias,pct:Math.min(100,Math.round(days/r.dias*100)),saved:days*r.est,today:!!set[ymd(new Date())]};
 }
-function points(){var p=0;Object.keys(S.joined).forEach(function(id){var s=retoStats(id),r=RETOS.filter(function(x){return x.id===id;})[0];if(s&&r)p+=s.days*r.pts+(s.done?50:0);});return p;}
+function activeMy(){var h={};S.retoHist.forEach(function(x){h[x.rid]=1;});return S.myRetos.concat(CL()?cloud.retos.filter(function(m){return !h[m.id];}):[]);}
+function retoEnd(start,dias){return ymd(addDays(parse(start),dias-1));}
+function uniqN(a){var o={};(a||[]).forEach(function(x){o[x]=1;});return Object.keys(o).length;}
+function myStats(m){
+  var days=uniqN(m.p['Tú']),t=ymd(new Date()),left=Math.max(0,Math.round((parse(retoEnd(m.start,m.dias))-parse(t))/864e5)+1);
+  return {days:days,done:days>=m.dias,pct:Math.min(100,Math.round(days/m.dias*100)),saved:days*m.est,today:(m.p['Tú']||[]).indexOf(t)>=0,left:Math.min(m.dias,left)};
+}
+function myRank(m){return ['Tú'].concat(m.amigos).map(function(n){return {n:n,d:uniqN(m.p[n]),me:n==='Tú'};}).sort(function(a,b){return b.d-a.d;});}
+/* Cuando un reto termina (lo completas o se acaba el plazo) pasa a "finalizado" con su clasificación congelada; el reto vuelve a estar disponible para empezar otro nuevo */
+function closeRetos(){
+  var t=ymd(new Date()),n=0;
+  Object.keys(S.joined).forEach(function(id){
+    var j=S.joined[id],r=RETOS.filter(function(x){return x.id===id;})[0];if(!r)return;
+    var st=retoStats(id);if(!(st.done||t>retoEnd(j.start,r.dias)))return;
+    var arr=[{n:'Tú',d:st.days,me:1}].concat(AMIGOS.map(function(a){return {n:a,d:friendDays(a,r)};})).sort(function(a,b){return b.d-a.d;});
+    S.retoHist.unshift({id:uid(),rid:id,custom:false,t:r.t,c:r.c,d:r.d,dias:r.dias,start:j.start,end:t,days:st.days,done:st.done,saved:st.saved,puntos:st.days*r.pts+(st.done?50:0),rank:arr,ejemplo:true});
+    delete S.joined[id];n++;
+  });
+  var arch=function(m){var st=myStats(m);if(!(st.done||t>retoEnd(m.start,m.dias)))return false;
+    S.retoHist.unshift({id:uid(),rid:m.id,custom:true,shared:!!m.shared,t:m.t,c:m.shared?'Reto compartido':'Reto propio',d:m.d,dias:m.dias,est:m.est,amigos:m.amigos.slice(),start:m.start,end:t,days:st.days,done:st.done,saved:st.saved,puntos:st.days*10+(st.done?50:0),rank:myRank(m),ejemplo:false});
+    n++;return true;};
+  S.myRetos=S.myRetos.filter(function(m){return !arch(m);});
+  if(CL())activeMy().forEach(function(m){if(m.shared)arch(m);});
+  return n;
+}
+function points(){var p=S.retoHist.reduce(function(a,h){return a+h.puntos;},0)+activeMy().reduce(function(a,m){return a+myStats(m).days*10;},0);Object.keys(S.joined).forEach(function(id){var s=retoStats(id),r=RETOS.filter(function(x){return x.id===id;})[0];if(s&&r)p+=s.days*r.pts+(s.done?50:0);});return p;}
 function level(pt){var i=0;LV.forEach(function(l,k){if(pt>=l[0])i=k;});return {i:i,name:LV[i][1],next:LV[i+1]||null,from:LV[i][0]};}
 function friendDays(name,r){var j=S.joined[r.id];var el=j?Math.max(1,Math.round((new Date()-parse(j.start))/864e5)+1):3;return Math.min(r.dias,Math.round(el*(0.55+(hash(name+r.id)%45)/100)));}
 
@@ -724,10 +753,31 @@ function gDebts(g){
 /* ---------- nube (Supabase) ---------- */
 var SB_URL='https://jvytaiwnyjyvxjpjhcce.supabase.co',SB_KEY='sb_publishable_0L2c8fZN37Em5oVgqmy9Ww_PcePVLil';   /* pega aquí la URL y la anon key de tu proyecto de Supabase */
 var sb=(SB_URL&&SB_KEY&&window.supabase)?window.supabase.createClient(SB_URL,SB_KEY):null;
-var cloud={user:null,groups:[],err:''};
+var cloud={user:null,groups:[],err:'',retos:[],retoErr:''};
 function CL(){return !!(sb&&cloud.user);}
 function gl(){return CL()?cloud.groups:S.groups;}
+async function cloudLoadRetos(){
+  try{
+    var r=await sb.from('retos').select('id,nombre,descripcion,dias,ahorro_dia,inicio,codigo,creador,reto_miembros(user_id,nombre),reto_checks(user_id,fecha)').order('created_at');
+    if(r.error){cloud.retoErr=r.error.message;cloud.retos=[];return;}
+    cloud.retoErr='';
+    cloud.retos=r.data.map(function(g){
+      var nm={},p={},am=[];
+      g.reto_miembros.forEach(function(m){var n=(m.user_id===cloud.user.id)?'Tú':m.nombre;nm[m.user_id]=n;p[n]=[];if(n!=='Tú')am.push(n);});
+      g.reto_checks.forEach(function(c){var n=nm[c.user_id];if(n&&p[n].indexOf(c.fecha)<0)p[n].push(c.fecha);});
+      if(!p['Tú'])p['Tú']=[];
+      return {id:g.id,t:g.nombre,d:g.descripcion||'',dias:g.dias,est:+g.ahorro_dia||0,start:g.inicio,code:g.codigo,mine:g.creador===cloud.user.id,shared:true,amigos:am,p:p};
+    });
+  }catch(e){cloud.retoErr=String(e.message||e);cloud.retos=[];}
+}
+function cloudNewReto(t,d,dias,est){
+  cloudDo(async function(){
+    var r=await sb.from('retos').insert({nombre:t,descripcion:d,dias:dias,ahorro_dia:est,inicio:ymd(new Date())}).select('id').single();if(r.error)return r;
+    return sb.from('reto_miembros').insert({reto_id:r.data.id,nombre:S.profile.nombre});
+  },'Reto creado: pasa el código a tus amigos para que se unan');
+}
 async function cloudLoad(){
+  await cloudLoadRetos();
   var r=await sb.from('grupos').select('id,nombre,codigo,grupo_miembros(id,nombre,user_id),grupo_gastos(id,concepto,importe_cents,pagador_id,fecha,grupo_reparto(miembro_id)),grupo_pagos(de_id,a_id,importe_cents)').order('created_at');
   if(r.error){cloud.err=r.error.message;return;}
   cloud.err='';
@@ -743,51 +793,25 @@ async function cloudDo(fn,ok){
   try{var r=await fn();if(r&&r.error)throw r.error;await cloudLoad();render();if(ok)toast(ok,'ok');}
   catch(e){toast('Error en la nube: '+(e.message||e),'bad');}
 }
-var authBusy=false;
-function authMsg(e){
-  var m=String((e&&e.message)||e||''),c=e&&(e.status||e.code);
-  if(/rate limit/i.test(m)||c===429)return 'Supabase ha limitado los correos de confirmación. Desactiva "Confirm email" en Supabase (Authentication > Sign In / Providers > Email) o espera un rato.';
-  if(/not confirmed/i.test(m))return 'Tu correo aún no está confirmado. Revisa tu bandeja o confirma el usuario en Supabase.';
-  if(/invalid login/i.test(m))return 'Email o contraseña incorrectos (o la cuenta no existe todavía).';
-  if(/already registered/i.test(m))return 'Ese email ya tiene cuenta: pulsa Entrar.';
-  return m||'No se pudo entrar';
-}
 async function cloudAuth(mode,em,pw){
-  if(authBusy)return;
   if(!em||pw.length<6){toast('Escribe un email y una contraseña de 6 caracteres o más','bad');return;}
-  authBusy=true;
   try{
     var r=mode==='up'?await sb.auth.signUp({email:em,password:pw}):await sb.auth.signInWithPassword({email:em,password:pw});
     if(r.error)throw r.error;
     if(!r.data.session){toast('Revisa tu correo para confirmar la cuenta y vuelve a entrar','ok');return;}
     cloud.user=r.data.user;await pullProfile();await cloudLoad();render(false);if(!S.profile)ACT.obStart();toast('Sesión iniciada','ok');
-  }catch(e){console.error('Auth:',e);toast(authMsg(e),'bad');}
-  finally{authBusy=false;}
+  }catch(e){toast(e.message||'No se pudo entrar','bad');}
 }
-var pushT=null,pushWarned=false;
-function profileRow(){
-  var p=S.profile;
-  return {id:cloud.user.id,nombre:p.nombre,edad:p.edad,estudios:p.estudios,ccaa:p.ccaa||'',centro:p.centro||'',ambito:p.ambito||'',vivienda:p.vivienda,modo:S.mode,gustos:p.gustos||[],datos:S,updated_at:new Date().toISOString()};
-}
-async function pushProfileNow(){
-  if(!CL()||!S.profile||S.example)return true;
-  var r=await sb.from('perfiles').upsert(profileRow());
-  if(r.error){
-    console.error('Error guardando en perfiles:',r.error);cloud.err=r.error.message;
-    if(!pushWarned){pushWarned=true;toast('No se pudo guardar tu perfil en la nube: '+r.error.message,'bad');}
-    return false;
-  }
-  cloud.err='';pushWarned=false;return true;
-}
+var pushT=null;
 function pushProfile(now){
   if(!CL()||!S.profile||S.example)return;
   clearTimeout(pushT);
-  pushT=setTimeout(function(){pushProfileNow().catch(function(e){console.error(e);});},now?0:1200);
+  pushT=setTimeout(async function(){try{var r=await sb.from('perfiles').upsert({user_id:cloud.user.id,datos:S,updated_at:new Date().toISOString()});if(r.error)cloud.err=r.error.message;}catch(e){}},now?0:1200);
 }
 async function pullProfile(){
   try{
-    var r=await sb.from('perfiles').select('datos').eq('id',cloud.user.id).maybeSingle();
-    if(r.error){console.error('Error leyendo perfiles:',r.error);cloud.err=r.error.message;return;}
+    var r=await sb.from('perfiles').select('datos').eq('user_id',cloud.user.id).maybeSingle();
+    if(r.error){cloud.err=r.error.message;return;}
     if(r.data&&r.data.datos&&r.data.datos.profile){
       S=Object.assign(defaults(),r.data.datos);S.example=false;fixState();
       S.card=Object.assign(defaults().card,S.card||{});if(!MODES[S.mode])S.mode='normal';
@@ -831,11 +855,7 @@ async function aiAsk(text){
   try{
     var ses=await sb.auth.getSession(),tok=ses.data.session.access_token;
     var hist=S.chat.filter(function(x){return !x.pending;}).slice(-12).map(function(x){return {role:x.r==='u'?'user':'assistant',content:x.t};});
-    var body=JSON.stringify({messages:hist,context:aiContext()}),hd={'Content-Type':'application/json',Authorization:'Bearer '+tok,apikey:SB_KEY},res=null,urls=[];
-    if(/^(localhost|127\.0\.0\.1)$/.test(location.hostname)||location.protocol==='file:')urls.push('http://127.0.0.1:5000/chat');
-    urls.push(SB_URL+'/functions/v1/chat');
-    for(var ui=0;ui<urls.length&&!res;ui++){try{res=await fetch(urls[ui],{method:'POST',headers:hd,body:body});}catch(_e){}}
-    if(!res)throw new Error('no hay servidor de IA (arranca server.py o despliega la función chat)');
+    var res=await fetch(SB_URL+'/functions/v1/chat',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+tok,apikey:SB_KEY},body:JSON.stringify({messages:hist,context:aiContext()})});
     var j=await res.json();if(!res.ok)throw new Error(j.error||'Error del asistente');out=j.reply;
   }catch(e){var f=bot(text);out=f.t+'\n(No he podido contactar con la IA: '+(e.message||e)+'. Te respondo con el modo básico.)';acts=f.acts||[];}
   S.chat=S.chat.filter(function(x){return !x.pending;});
@@ -1090,7 +1110,7 @@ function vInicio(){
   var m=model(),p=S.profile;
   var ban=S.mode==='sos'?'<div class="banner"><span><strong>Modo Fin de mes (SOS) activo.</strong> '+(S.modeAuto?'Se activó solo porque te queda menos del 5 % del presupuesto.':'Lo has activado tú para ahorrar más este mes.')+' Solo lo esencial hasta que empiece el mes que viene.</span><button class="btn sm" data-act="sos">Ver qué hacer ahora</button></div>':'';
   return ban+'<div><h1>Hola, '+esc(p.nombre)+'.</h1>'+(S.example?'<p class="sub">Estás viendo un perfil de ejemplo. Pulsa “Borrar mis datos” al final de la página para crear el tuyo.</p>':'<p class="sub">Esto es lo que tienes para hoy y para lo que queda de mes.</p>')+'</div>'+
-  '<div class="cols"><div class="col">'+ticketHtml(m)+quickAdd(m)+ingresosHtml(m)+chartSpend(m)+catsHtml(m)+'</div><div class="col">'+modeNotes(m)+planMiniHtml()+ocioHtml(m)+subsHtml()+cardPanel()+upcomingHtml()+topAyudasHtml()+'</div></div>';
+  '<div class="flow">'+ticketHtml(m)+quickAdd(m)+ingresosHtml(m)+chartSpend(m)+catsHtml(m)+modeNotes(m)+planMiniHtml()+ocioHtml(m)+subsHtml()+cardPanel()+upcomingHtml()+topAyudasHtml()+'</div>';
 }
 
 /* ayudas */
@@ -1150,20 +1170,45 @@ function vCalendario(){
 function vRetos(){
   var pt=points(),lv=level(pt),next=lv.next,pct=next?Math.round((pt-lv.from)/(next[0]-lv.from)*100):100;
   var invite='¡Únete a mi reto de ahorro en STUD€NTIA! Vamos a ver quién llega mejor a fin de mes: '+location.href.split('#')[0];
-  var savedTot=0;Object.keys(S.joined).forEach(function(id){var s=retoStats(id);if(s)savedTot+=s.saved;});
+  var savedTot=S.retoHist.reduce(function(a,h){return a+h.saved;},0)+activeMy().reduce(function(a,m){return a+myStats(m).saved;},0);Object.keys(S.joined).forEach(function(id){var s=retoStats(id);if(s)savedTot+=s.saved;});
   var cards=RETOS.map(function(r){
-    var s=retoStats(r.id),rank='';
+    var s=retoStats(r.id),rank='',nT=S.retoHist.filter(function(h){return h.rid===r.id;}).length;
     if(s){var arr=[{n:'Tú',d:s.days,me:1}].concat(AMIGOS.map(function(a){return {n:a,d:friendDays(a,r)};})).sort(function(a,b){return b.d-a.d;});
       rank='<details><summary>Clasificación con amigos (ejemplo)</summary><ol class="rank">'+arr.map(function(x,i){return '<li class="'+(x.me?'me':'')+'"><span class="num">'+(i+1)+'</span><span>'+esc(x.n)+'</span><span class="num">'+x.d+'/'+r.dias+' días</span></li>';}).join('')+'</ol></details>';}
     return '<article class="panel"><div class="row"><span class="chip tag">'+esc(r.c)+'</span><span class="hint num">'+r.dias+' días · '+r.pts+' pts/día</span></div><h3>'+esc(r.t)+'</h3><p class="sc-d">'+esc(r.d)+'</p>'+
     (s?'<div class="meter" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="'+s.pct+'" aria-label="Progreso"><i style="width:'+s.pct+'%"></i></div><p class="hint num">'+s.days+' de '+r.dias+' días · racha '+s.streak+' · ahorro estimado '+eur(s.saved)+'</p>'+
       '<div class="row"><button class="btn primary sm" data-act="checkin" data-id="'+r.id+'"'+(s.today||s.done?' disabled':'')+'>'+(s.done?'Reto superado':s.today?'Hoy ya está':'Hoy lo he cumplido')+'</button><button class="btn sm ghost" data-act="leave" data-id="'+r.id+'">Salir</button></div>'+rank:
-      '<button class="btn primary sm" data-act="join" data-id="'+r.id+'">Unirme al reto</button>')+'</article>';
+      (nT?'<p class="hint">Lo has terminado '+nT+(nT===1?' vez':' veces')+'. Hay una nueva edición disponible.</p>':'')+'<button class="btn primary sm" data-act="join" data-id="'+r.id+'">Unirme al reto</button>')+'</article>';
   }).join('');
+  var myCards=activeMy().map(function(m){
+    var st=myStats(m),rk=myRank(m);
+    return '<article class="panel"><div class="row"><span class="chip tag">'+(m.shared?'Reto compartido':'Reto propio')+'</span><span class="hint num">'+m.dias+' días · quedan '+st.left+'</span></div><h3>'+esc(m.t)+'</h3>'+(m.d?'<p class="sc-d">'+esc(m.d)+'</p>':'')+
+    '<div class="meter" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="'+st.pct+'" aria-label="Progreso"><i style="width:'+st.pct+'%"></i></div><p class="hint num">'+st.days+' de '+m.dias+' días'+(m.est?' · ahorro estimado '+eur(st.saved):'')+'</p>'+
+    '<ol class="rank">'+rk.map(function(x,i){return '<li class="'+(x.me?'me':'')+'"><span class="num">'+(i+1)+'</span><span>'+esc(x.n)+'</span><span class="num">'+x.d+'/'+m.dias+' días</span></li>';}).join('')+'</ol>'+
+    '<div class="row"><button class="btn primary sm" data-act="myCheck" data-id="'+m.id+'" data-who="Tú"'+(st.today?' disabled':'')+'>'+(st.today?'Hoy ya está':'Hoy lo he cumplido')+'</button>'+
+    (m.shared?'':m.amigos.map(function(a){var dn=(m.p[a]||[]).indexOf(ymd(new Date()))>=0;return '<button class="btn sm" data-act="myCheck" data-id="'+m.id+'" data-who="'+esc(a)+'"'+(dn?' disabled':'')+'>'+esc(a)+(dn?' ✓':' hoy')+'</button>';}).join(''))+
+    '<button class="btn sm ghost danger" data-act="myDel" data-id="'+m.id+'">'+(m.shared&&!m.mine?'Salir':'Borrar')+'</button></div>'+
+    (m.shared?'<p class="hint">Cada integrante marca sus propios días desde su cuenta. Código para unirse: <strong class="num">'+esc(m.code)+'</strong> <button class="btn sm ghost" data-act="copyInvite" data-t="'+esc('Únete a mi reto «'+m.t+'» en STUD€NTIA: entra en Retos → «Unirme con un código» e introduce '+m.code+'. '+location.href.split('#')[0])+'">Copiar invitación</button></p>':'')+'</article>';
+  }).join('');
+  var formReto='<form class="panel" data-form="reto"><h2>Crea tu propio reto con amigos</h2><div class="row">'+
+    '<label class="f grow"><span>Nombre del reto</span><input id="rt-t" required maxlength="40" placeholder="Sin Glovo hasta el viernes"></label>'+
+    '<label class="f"><span>Duración (días)</span><input id="rt-n" type="number" min="1" max="365" required value="7"></label>'+
+    '<label class="f"><span>Ahorro estimado por día (€, opcional)</span><input id="rt-e" type="number" min="0" step="0.5" inputmode="decimal" placeholder="0"></label></div>'+
+    '<label class="f"><span>Qué hay que hacer</span><input id="rt-d" maxlength="160" placeholder="Cocinar en casa todos los días"></label>'+
+    (CL()&&!cloud.retoErr?'<label class="sw"><input id="rt-sh" type="checkbox" checked>Reto compartido: tus amigos se unen con un código y cada uno marca sus propios días</label>':'<p class="hint">'+(CL()?'Para retos compartidos hay que crear las tablas de retos en Supabase (ver retos.sql).':'Inicia sesión en Grupos para crear retos compartidos en los que cada amigo marque sus propios días.')+' Mientras tanto puedes crear un reto en este dispositivo y apuntar tú los días de todos.</p>')+
+    '<label class="f"><span>Amigos que participan (solo si no es compartido; separados por comas)</span><input id="rt-a" maxlength="160" placeholder="Lucía, Marcos, Dani"></label>'+
+    '<div class="row"><button class="btn primary" type="submit">Crear reto</button><span class="hint">En un reto solo de este dispositivo tú apuntas también los días de tus amigos. Al acabar el plazo o completarlo, el reto pasa a finalizados con su clasificación.</span></div></form>';
+  var joinForm=(CL()&&!cloud.retoErr)?'<form class="panel" data-form="joinreto"><h2>Unirme con un código<button type="button" class="btn sm ghost" data-act="retoRefresh">Actualizar</button></h2><div class="row"><label class="f grow"><span>Código que te ha pasado tu amigo</span><input id="jr-code" maxlength="12" placeholder="a1b2c3"></label><button class="btn primary" type="submit">Unirme</button></div></form>':'';
+  var histPanel=S.retoHist.length?'<section class="panel"><h2>Retos finalizados<span class="num">'+S.retoHist.length+'</span></h2><div class="grid">'+S.retoHist.map(function(h){
+    return '<article class="panel"><div class="row"><span class="pill '+(h.done?'ok':'warn')+'">'+(h.done?'Finalizado · completado':'Finalizado · sin completar')+'</span><span class="chip tag">'+esc(h.c)+'</span></div><h3>'+esc(h.t)+'</h3>'+
+    '<p class="hint num">'+esc(parse(h.start).toLocaleDateString('es-ES',{day:'numeric',month:'short'}))+' → '+esc(parse(h.end).toLocaleDateString('es-ES',{day:'numeric',month:'short'}))+' · '+h.days+' de '+h.dias+' días'+(h.saved?' · ahorro estimado '+eur(h.saved):'')+' · '+h.puntos+' pts</p>'+
+    '<details><summary>Clasificación final'+(h.ejemplo?' (ejemplo)':'')+'</summary><ol class="rank">'+h.rank.map(function(x,i){return '<li class="'+(x.me?'me':'')+'"><span class="num">'+(i+1)+'</span><span>'+esc(x.n)+'</span><span class="num">'+x.d+'/'+h.dias+' días</span></li>';}).join('')+'</ol></details>'+
+    '<div class="row"><button class="btn sm" data-act="repeatReto" data-id="'+h.id+'">Empezar otro igual</button></div></article>';
+  }).join('')+'</div></section>':'';
   return '<div><h1>Retos entre amigos</h1><p class="sub">Elige un reto, apunta cada día que lo cumples y compara tu racha con la de tus amigos.</p></div>'+
   '<section class="panel"><div class="lvl"><div><span class="hint">Tu nivel</span><br><strong>'+lv.name+'</strong></div><div style="flex:1 1 220px;min-width:0"><div class="meter" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="'+pct+'" aria-label="Progreso de nivel"><i style="width:'+pct+'%"></i></div><p class="hint num">'+pt+' puntos'+(next?' · '+(next[0]-pt)+' para '+next[1]:' · nivel máximo')+'</p></div><div><span class="hint">Ahorro estimado</span><br><strong class="num">'+eur(savedTot)+'</strong></div></div>'+
   '<div class="row"><button class="btn" data-act="copyInvite" data-t="'+esc(invite)+'">Copiar invitación para amigos</button><span class="hint">Los amigos de la clasificación son de ejemplo. Sincronizar con amigos reales necesita cuentas y servidor.</span></div></section>'+
-  '<div class="grid">'+cards+'</div>';
+  formReto+joinForm+'<div class="grid">'+myCards+cards+'</div>'+histPanel;
 }
 
 /* simulador */
@@ -1191,7 +1236,9 @@ function simOut(){
   var chart='<svg class="ch" viewBox="0 0 '+W+' '+H+'" role="img" aria-label="Porcentaje de tus ingresos que se va en alquiler según con cuántas personas compartas piso">'+yl+bars+'</svg><div class="legend"><span><span class="kind ingreso"></span>Dentro del 30 %</span><span><span class="kind gasto"></span>Por encima del 30 %</span></div>';
   var li=function(ok,t){return '<li class="'+(ok?'y':'n')+'"><b aria-hidden="true">'+(ok?'✓':'✗')+'</b><span>'+t+'</span></li>';};
   var checks='<ul class="chk">'+li(c.ageOk,'Edad entre 18 y 35 años ('+p.edad+')')+li(c.incOk,'Ingresos por debajo de 3 veces el IPREM (unos 2.100 € al mes)')+li(c.rentOk,s.tipo==='habitacion'?'Tu parte del alquiler ('+eur(c.share)+') no supera el tope de '+eur(s.tope):'El alquiler total ('+eur(s.rent)+') no supera el tope de '+eur(s.tope))+'</ul>';
-  return '<div class="verdict '+verdict+'"><h2>'+title+'</h2><p>'+detail+'</p></div>'+
+  var bdA=objDef('piso').bd(),needA=bdA.reduce(function(a,x){return a+x[1];},0),haveA=+s.ahorrado||0,faltaA=Math.max(0,needA-haveA),margenA=s.ingresos-total,mesesA=faltaA>0&&margenA>0?Math.ceil(faltaA/margenA):0;
+  var ahorroPanel='<section class="panel"><h2>Ahorro que deberías tener antes de emanciparte<span class="num">'+eur(needA)+'</span></h2><ul class="list">'+bdA.map(function(x){return '<li><span class="l">'+esc(x[0])+'</span><span class="num">'+eur(x[1])+'</span></li>';}).join('')+'<li><span class="l"><strong>Ya tienes ahorrado</strong></span><span class="num">'+eur(haveA)+'</span></li><li><span class="l"><strong>'+(faltaA>0?'Te faltan':'Ya llegas')+'</strong></span><span class="num">'+eur(faltaA)+'</span></li></ul><p class="hint">'+(faltaA<=0?'Con lo que tienes ya cubres la entrada a un piso.':margenA>0?'Con lo que te sobra al mes ('+eur(margenA)+') lo conseguirías en unos '+fmtMeses(mesesA)+'.':'Con tus gastos actuales no te sobra dinero al mes para ahorrar lo que falta.')+'</p></section>';
+  return '<div class="verdict '+verdict+'"><h2>'+title+'</h2><p>'+detail+'</p></div>'+ahorroPanel+
     '<section class="panel"><h2>Cómo se reparten tus ingresos</h2>'+stack+'</section>'+
     '<section class="panel"><h2>Según con cuántas personas compartas</h2>'+chart+'</section>'+
     '<section class="panel"><h2>Requisitos del Bono Alquiler Joven</h2>'+checks+'<p class="hint">Los topes de alquiler cambian según la comunidad. Algunas, como Madrid, Cataluña o Baleares, los han subido. Ajusta el tope a tu convocatoria.</p></section>';
@@ -1204,6 +1251,7 @@ function vEmancipacion(){
   '<label class="f"><span>Alquiler total del piso (€ al mes)</span><input id="sm-rent" type="number" min="0" step="10" data-sim="rent" value="'+s.rent+'"></label>'+
   '<label class="f"><span>Personas en el piso: <output id="sm-n-o" class="num">'+s.n+'</output></span><input id="sm-n" type="range" min="1" max="6" step="1" data-sim="n" value="'+s.n+'"></label>'+
   '<label class="f"><span>Gastos de vida al mes: comida, suministros, transporte (€)</span><input id="sm-vida" type="number" min="0" step="10" data-sim="vida" value="'+s.vida+'"></label>'+
+  '<label class="f"><span>¿Cuánto tienes ya ahorrado? (€)</span><input id="sm-ahorrado" type="number" min="0" step="10" data-sim="ahorrado" value="'+(s.ahorrado||0)+'"></label>'+
   '<label class="f"><span>Tipo de contrato</span><select id="sm-tipo" data-sim="tipo"><option value="habitacion"'+(s.tipo==='habitacion'?' selected':'')+'>Una habitación</option><option value="piso"'+(s.tipo==='piso'?' selected':'')+'>El piso completo</option></select></label>'+
   '<label class="f"><span>Tope de alquiler de tu comunidad (€)</span><input id="sm-tope" type="number" min="0" step="10" data-sim="tope" value="'+s.tope+'"></label>'+
   '<label class="sw"><input id="sm-bono" type="checkbox" data-sim="bono"'+(s.bono?' checked':'')+'>Aplicar el Bono Alquiler Joven (250 € al mes)</label>'+
@@ -1330,6 +1378,7 @@ function render(keep){
   if(S.profile){
     if(S.mode==='sos'&&S.modeMonth&&S.modeMonth!==curMes()){S.mode='normal';S.modeMonth='';S.flags.newMonth=1;}
     if(closeMonths()){save();}
+    var nFin=closeRetos();if(nFin){save();setTimeout(function(){toast(nFin===1?'Un reto ha finalizado. Lo tienes en «Retos finalizados» y puedes empezar otro':nFin+' retos han finalizado','ok');},50);}
     checkAlerts(false);
     if(S.flags.newMonth){delete S.flags.newMonth;save();setTimeout(function(){toast('Nuevo mes: vuelves a modo Normal'+(carryNow()>0?' y lo que te sobró se suma a tu presupuesto':''),'ok');},50);}
   }
@@ -1373,15 +1422,29 @@ var ACT={
   delEvent:function(el){S.events=S.events.filter(function(e){return e.id!==el.dataset.id;});save();render();},
   copyIcs:function(){var l=[],n=dim(calCur.y,calCur.m);for(var d=1;d<=n;d++)eventsOn(new Date(calCur.y,calCur.m,d)).forEach(function(e){l.push(e);});copy(icsFor(l),'Eventos copiados. Pégalos en un archivo .ics');},
   join:function(el){S.joined[el.dataset.id]={start:ymd(new Date()),checks:[]};save();render();toast('Te has unido al reto','ok');},
+  myCheck:function(el){
+    var m=activeMy().filter(function(x){return x.id===el.dataset.id;})[0];if(!m)return;var w=el.dataset.who,k=ymd(new Date());
+    if(m.shared){if((m.p['Tú']||[]).indexOf(k)>=0)return;cloudDo(function(){return sb.from('reto_checks').insert({reto_id:m.id,user_id:cloud.user.id,fecha:k});},'Hoy apuntado');return;}
+    m.p[w]=m.p[w]||[];if(m.p[w].indexOf(k)<0)m.p[w].push(k);save();render();toast(w==='Tú'?'Hoy apuntado':'Día apuntado a '+w,'ok');},
+  myDel:function(el){
+    var m=activeMy().filter(function(x){return x.id===el.dataset.id;})[0];
+    if(m&&m.shared){cloudDo(function(){return m.mine?sb.from('retos').delete().eq('id',m.id):sb.from('reto_miembros').delete().eq('reto_id',m.id).eq('user_id',cloud.user.id);},m.mine?'Reto borrado':'Has salido del reto');return;}
+    S.myRetos=S.myRetos.filter(function(x){return x.id!==el.dataset.id;});save();render();toast('Reto borrado','ok');},
+  retoRefresh:function(){cloudDo(function(){return null;},'Retos actualizados');},
+  repeatReto:function(el){var h=S.retoHist.filter(function(x){return x.id===el.dataset.id;})[0];if(!h)return;
+    if(h.shared&&CL()&&!cloud.retoErr){cloudNewReto(h.t,h.d,h.dias,h.est||0);return;}
+    if(h.custom){var p={'Tú':[]};h.amigos.forEach(function(a){p[a]=[];});S.myRetos.push({id:uid(),t:h.t,d:h.d,dias:h.dias,est:h.est||0,start:ymd(new Date()),amigos:h.amigos.slice(),p:p});}
+    else if(!S.joined[h.rid])S.joined[h.rid]={start:ymd(new Date()),checks:[]};
+    save();render();toast('Nuevo reto empezado','ok');},
   leave:function(el){delete S.joined[el.dataset.id];save();render();},
-  checkin:function(el){var j=S.joined[el.dataset.id],k=ymd(new Date());if(j.checks.indexOf(k)<0)j.checks.push(k);save();render();var s=retoStats(el.dataset.id);toast(s.done?'Reto superado. +50 puntos':'Racha de '+s.streak+(s.streak===1?' día':' días'),'ok');},
+  checkin:function(el){var j=S.joined[el.dataset.id],k=ymd(new Date());if(j.checks.indexOf(k)<0)j.checks.push(k);save();var s=retoStats(el.dataset.id);render();toast(s.done?'Reto superado. +50 puntos':'Racha de '+s.streak+(s.streak===1?' día':' días'),'ok');},
   copyInvite:function(el){copy(el.dataset.t,'Invitación copiada');},
   simPlan:function(){var d=objDef('piso'),cur=S.plans.piso||{};S.plans.piso={on:true,target:d.def(),months:cur.months||12,saved:cur.saved||0};save();location.hash='#planes';toast('Plan para independizarte activado','ok');},
   planOn:function(el){var d=PLANES.filter(function(p){return p.id===el.dataset.id;})[0],i=planInfo(d),cur=S.plans[d.id]||{};S.plans[d.id]=Object.assign(cur,{on:true,target:i.target,months:i.months,saved:i.saved});save();render();toast('Plan activado: '+eur(i.monthly)+' al mes','ok');},
   planOff:function(el){S.plans[el.dataset.id].on=false;save();render();},
   aporta:function(el){var p=S.plans[el.dataset.id];p.saved+=+el.dataset.v;save();render();toast('Aportación apuntada','ok');},
   signup:function(){cloudAuth('up',$('#au-mail').value.trim(),$('#au-pass').value);},
-  signout:async function(){if(CL()&&S.profile&&!S.example){clearTimeout(pushT);var okp=await pushProfileNow();if(!okp){toast('No cierro la sesión: tu perfil todavía no está guardado en la nube','bad');return;}}sb.auth.signOut().then(function(){clearTimeout(pushT);cloud.user=null;cloud.groups=[];S=defaults();D=null;mem=null;try{localStorage.removeItem(KEY);}catch(e){}location.hash='';render(false);toast('Sesión cerrada','ok');});},
+  signout:function(){sb.auth.signOut().then(function(){clearTimeout(pushT);cloud.user=null;cloud.groups=[];cloud.retos=[];S=defaults();D=null;mem=null;try{localStorage.removeItem(KEY);}catch(e){}location.hash='';render(false);toast('Sesión cerrada','ok');});},
   gSel:function(el){gSel=el.dataset.id;render();},
   gExample:function(){var g=gExample();S.groups.push(g);gSel=g.id;save();render();toast('Grupo de ejemplo creado','ok');},
   gDel:function(el){if(CL()){cloudDo(function(){return sb.from('grupos').delete().eq('id',el.dataset.id);});return;}S.groups=S.groups.filter(function(x){return x.id!==el.dataset.id;});save();render();},
@@ -1397,7 +1460,7 @@ var ACT={
   obFinish:function(){var e=validate(D);D.err=e;if(e){render(false);return;}finishOnboard();},
   gusto:function(el){var v=el.dataset.v,i=D.gustos.indexOf(v);if(i<0)D.gustos.push(v);else D.gustos.splice(i,1);render();},
   applyPlan:function(){var a=advice();S.profile.ahorro=a.monthly;if(a.od){var cur=S.plans[a.od.id]||{saved:0};S.plans[a.od.id]=Object.assign(cur,{on:true,target:a.target,months:a.months,saved:cur.saved||0});}save();render();toast('Plan aplicado: apartas '+eur(a.monthly)+' al mes','ok');},
-  reset:function(){if(!resetArmed){resetArmed=true;render();setTimeout(function(){resetArmed=false;render();},4000);return;}resetArmed=false;if(CL())sb.from('perfiles').delete().eq('id',cloud.user.id).then(function(){});S=defaults();D=null;try{localStorage.removeItem(KEY);}catch(e){}mem=null;location.hash='';render(false);}
+  reset:function(){if(!resetArmed){resetArmed=true;render();setTimeout(function(){resetArmed=false;render();},4000);return;}resetArmed=false;if(CL())sb.from('perfiles').delete().eq('user_id',cloud.user.id).then(function(){});S=defaults();D=null;try{localStorage.removeItem(KEY);}catch(e){}mem=null;location.hash='';render(false);}
 };
 function decide(dir){
   var top=$('.swipe-top');if(!top)return;
@@ -1465,6 +1528,12 @@ document.addEventListener('submit',function(e){
   var k=f.dataset.form;
   if(k==='gasto'){var a=num($('#qa-amt').value);if(!a){toast('Escribe un importe mayor que cero','bad');return;}addGasto(a,$('#qa-cat').value,$('#qa-con').value.trim(),$('#qa-pay').value);}
   if(k==='ingreso'){var ia=num($('#qi-amt').value);if(!ia){toast('Escribe un importe mayor que cero','bad');return;}addIngreso(ia,$('#qi-tipo').value,$('#qi-con').value.trim());}
+  if(k==='reto'){var rt=$('#rt-t').value.trim().slice(0,40),rd=parseInt($('#rt-n').value,10);if(!rt){toast('Ponle un nombre al reto','bad');return;}if(!(rd>=1&&rd<=365)){toast('La duración va de 1 a 365 días','bad');return;}
+    if($('#rt-sh')&&$('#rt-sh').checked){cloudNewReto(rt,$('#rt-d').value.trim().slice(0,160),rd,num($('#rt-e').value));return;}
+    var am=[];$('#rt-a').value.split(',').forEach(function(x){x=x.trim().slice(0,20);if(x&&x!=='Tú'&&am.indexOf(x)<0&&am.length<8)am.push(x);});
+    var pp={'Tú':[]};am.forEach(function(a){pp[a]=[];});
+    S.myRetos.push({id:uid(),t:rt,d:$('#rt-d').value.trim().slice(0,160),dias:rd,est:num($('#rt-e').value),start:ymd(new Date()),amigos:am,p:pp});save();render();toast('Reto creado','ok');}
+  if(k==='joinreto'){var jr=$('#jr-code').value.trim().toLowerCase();if(!jr){toast('Escribe el código del reto','bad');return;}cloudDo(function(){return sb.rpc('unirse_reto',{cod:jr,mi_nombre:S.profile.nombre});},'Te has unido al reto');return;}
   if(k==='evento'){var t=$('#ev-title').value.trim(),dt=$('#ev-date').value;if(!t||!dt)return;S.events.push({id:uid(),title:t,date:dt,kind:$('#ev-kind').value,amt:num($('#ev-amt').value),guests:$('#ev-guests').value.trim().replace(/\s+/g,'')});calSel=dt;var p=parse(dt);calCur={y:p.getFullYear(),m:p.getMonth()};save();render();toast('Evento guardado','ok');}
   if(k==='auth'){cloudAuth('in',$('#au-mail').value.trim(),$('#au-pass').value);return;}
   if(k==='join'){var jc=$('#jn-code').value.trim().toLowerCase();cloudDo(function(){return sb.rpc('unirse_grupo',{cod:jc,mi_nombre:S.profile.nombre});},'Te has unido al grupo');return;}
@@ -1487,7 +1556,7 @@ document.addEventListener('change',function(e){
   if(el.dataset.plan){var d=PLANES.filter(function(p){return p.id===el.dataset.plan;})[0],i=planInfo(d),st=S.plans[d.id]||{on:false,target:i.target,months:i.months,saved:i.saved},k=el.dataset.k;st[k]=num(el.value);S.plans[d.id]=st;if(k==='precio')st.target=d.def();if(k==='months'&&S.profile.objetivo===d.id)S.profile.plazo=st.months;save();render();}
   if(el.dataset.d&&el.tagName==='SELECT'&&D){var wasUni=isUni(D.estudios);setPath(D,el.dataset.d,el.value);if(el.dataset.d==='ccaa'){if(isUni(D.estudios)){D.centro='';D.ambito='';}D.err='';render();}else if(el.dataset.d==='centro'){D.err='';render();}else if(el.dataset.d==='estudios'){if(wasUni!==isUni(D.estudios)){D.centro='';D.ambito='';}D.err='';render();}}
 });
-window.addEventListener('hashchange',function(){render(false);});
+window.addEventListener('hashchange',function(){render(false);if(location.hash==='#retos'&&CL())cloudLoadRetos().then(function(){render();});});
 document.addEventListener('keydown',function(e){if(e.key==='Escape'&&!$('#sos').hidden)closeSOS();});
 document.addEventListener('click',function(e){var o=$('#sos');if(!o.hidden&&e.target===o)closeSOS();});
 
