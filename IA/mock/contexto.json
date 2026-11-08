@@ -1,0 +1,31 @@
+{
+    "perfil": {
+        "nombre": "Adrian",
+        "edad": 20,
+        "estudios": "Ingeniería, 2º curso",
+        "ciudad": "Madrid"
+    },
+    "presupuesto_mensual": 400,
+    "gastos_fijos": 70,
+    "disponible": 180,
+    "dias_restantes": 18,
+    "ritmo": 0.85,
+    "modo": "Cuidado",
+    "gastos_por_categoria": {
+        "comida": 90,
+        "ocio": 40,
+        "transporte": 20
+    },
+    "becas_top": [
+        {
+            "nombre": "Beca de ejemplo A",
+            "importe": 1500,
+            "plazo": "2026-12-15"
+        },
+        {
+            "nombre": "Beca de ejemplo B",
+            "importe": 800,
+            "plazo": "2027-01-10"
+        }
+    ]
+}
