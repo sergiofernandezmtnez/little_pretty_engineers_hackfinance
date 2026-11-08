@@ -793,25 +793,51 @@ async function cloudDo(fn,ok){
   try{var r=await fn();if(r&&r.error)throw r.error;await cloudLoad();render();if(ok)toast(ok,'ok');}
   catch(e){toast('Error en la nube: '+(e.message||e),'bad');}
 }
+var authBusy=false;
+function authMsg(e){
+  var m=String((e&&e.message)||e||''),c=e&&(e.status||e.code);
+  if(/rate limit/i.test(m)||c===429)return 'Supabase ha limitado los correos de confirmación. Desactiva "Confirm email" en Supabase (Authentication > Sign In / Providers > Email) o espera un rato.';
+  if(/not confirmed/i.test(m))return 'Tu correo aún no está confirmado. Revisa tu bandeja o confirma el usuario en Supabase.';
+  if(/invalid login/i.test(m))return 'Email o contraseña incorrectos (o la cuenta no existe todavía).';
+  if(/already registered/i.test(m))return 'Ese email ya tiene cuenta: pulsa Entrar.';
+  return m||'No se pudo entrar';
+}
 async function cloudAuth(mode,em,pw){
+  if(authBusy)return;
   if(!em||pw.length<6){toast('Escribe un email y una contraseña de 6 caracteres o más','bad');return;}
+  authBusy=true;
   try{
     var r=mode==='up'?await sb.auth.signUp({email:em,password:pw}):await sb.auth.signInWithPassword({email:em,password:pw});
     if(r.error)throw r.error;
     if(!r.data.session){toast('Revisa tu correo para confirmar la cuenta y vuelve a entrar','ok');return;}
     cloud.user=r.data.user;await pullProfile();await cloudLoad();render(false);if(!S.profile)ACT.obStart();toast('Sesión iniciada','ok');
-  }catch(e){toast(e.message||'No se pudo entrar','bad');}
+  }catch(e){console.error('Auth:',e);toast(authMsg(e),'bad');}
+  finally{authBusy=false;}
 }
-var pushT=null;
+var pushT=null,pushWarned=false;
+function profileRow(){
+  var p=S.profile;
+  return {id:cloud.user.id,nombre:p.nombre,edad:p.edad,estudios:p.estudios,ccaa:p.ccaa||'',centro:p.centro||'',ambito:p.ambito||'',vivienda:p.vivienda,modo:S.mode,gustos:p.gustos||[],datos:S,updated_at:new Date().toISOString()};
+}
+async function pushProfileNow(){
+  if(!CL()||!S.profile||S.example)return true;
+  var r=await sb.from('perfiles').upsert(profileRow());
+  if(r.error){
+    console.error('Error guardando en perfiles:',r.error);cloud.err=r.error.message;
+    if(!pushWarned){pushWarned=true;toast('No se pudo guardar tu perfil en la nube: '+r.error.message,'bad');}
+    return false;
+  }
+  cloud.err='';pushWarned=false;return true;
+}
 function pushProfile(now){
   if(!CL()||!S.profile||S.example)return;
   clearTimeout(pushT);
-  pushT=setTimeout(async function(){try{var r=await sb.from('perfiles').upsert({user_id:cloud.user.id,datos:S,updated_at:new Date().toISOString()});if(r.error)cloud.err=r.error.message;}catch(e){}},now?0:1200);
+  pushT=setTimeout(function(){pushProfileNow().catch(function(e){console.error(e);});},now?0:1200);
 }
 async function pullProfile(){
   try{
-    var r=await sb.from('perfiles').select('datos').eq('user_id',cloud.user.id).maybeSingle();
-    if(r.error){cloud.err=r.error.message;return;}
+    var r=await sb.from('perfiles').select('datos').eq('id',cloud.user.id).maybeSingle();
+    if(r.error){console.error('Error leyendo perfiles:',r.error);cloud.err=r.error.message;return;}
     if(r.data&&r.data.datos&&r.data.datos.profile){
       S=Object.assign(defaults(),r.data.datos);S.example=false;fixState();
       S.card=Object.assign(defaults().card,S.card||{});if(!MODES[S.mode])S.mode='normal';
@@ -855,7 +881,11 @@ async function aiAsk(text){
   try{
     var ses=await sb.auth.getSession(),tok=ses.data.session.access_token;
     var hist=S.chat.filter(function(x){return !x.pending;}).slice(-12).map(function(x){return {role:x.r==='u'?'user':'assistant',content:x.t};});
-    var res=await fetch(SB_URL+'/functions/v1/chat',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+tok,apikey:SB_KEY},body:JSON.stringify({messages:hist,context:aiContext()})});
+    var body=JSON.stringify({messages:hist,context:aiContext()}),hd={'Content-Type':'application/json',Authorization:'Bearer '+tok,apikey:SB_KEY},res=null,urls=[];
+    if(/^(localhost|127\.0\.0\.1)$/.test(location.hostname)||location.protocol==='file:')urls.push('http://127.0.0.1:5000/chat');
+    urls.push(SB_URL+'/functions/v1/chat');
+    for(var ui=0;ui<urls.length&&!res;ui++){try{res=await fetch(urls[ui],{method:'POST',headers:hd,body:body});}catch(_e){}}
+    if(!res)throw new Error('no hay servidor de IA (arranca server.py o despliega la función chat)');
     var j=await res.json();if(!res.ok)throw new Error(j.error||'Error del asistente');out=j.reply;
   }catch(e){var f=bot(text);out=f.t+'\n(No he podido contactar con la IA: '+(e.message||e)+'. Te respondo con el modo básico.)';acts=f.acts||[];}
   S.chat=S.chat.filter(function(x){return !x.pending;});
@@ -1444,7 +1474,7 @@ var ACT={
   planOff:function(el){S.plans[el.dataset.id].on=false;save();render();},
   aporta:function(el){var p=S.plans[el.dataset.id];p.saved+=+el.dataset.v;save();render();toast('Aportación apuntada','ok');},
   signup:function(){cloudAuth('up',$('#au-mail').value.trim(),$('#au-pass').value);},
-  signout:function(){sb.auth.signOut().then(function(){clearTimeout(pushT);cloud.user=null;cloud.groups=[];cloud.retos=[];S=defaults();D=null;mem=null;try{localStorage.removeItem(KEY);}catch(e){}location.hash='';render(false);toast('Sesión cerrada','ok');});},
+  signout:async function(){if(CL()&&S.profile&&!S.example){clearTimeout(pushT);var okp=await pushProfileNow();if(!okp){toast('No cierro la sesión: tu perfil todavía no está guardado en la nube','bad');return;}}sb.auth.signOut().then(function(){clearTimeout(pushT);cloud.user=null;cloud.groups=[];cloud.retos=[];S=defaults();D=null;mem=null;try{localStorage.removeItem(KEY);}catch(e){}location.hash='';render(false);toast('Sesión cerrada','ok');});},
   gSel:function(el){gSel=el.dataset.id;render();},
   gExample:function(){var g=gExample();S.groups.push(g);gSel=g.id;save();render();toast('Grupo de ejemplo creado','ok');},
   gDel:function(el){if(CL()){cloudDo(function(){return sb.from('grupos').delete().eq('id',el.dataset.id);});return;}S.groups=S.groups.filter(function(x){return x.id!==el.dataset.id;});save();render();},
@@ -1460,7 +1490,7 @@ var ACT={
   obFinish:function(){var e=validate(D);D.err=e;if(e){render(false);return;}finishOnboard();},
   gusto:function(el){var v=el.dataset.v,i=D.gustos.indexOf(v);if(i<0)D.gustos.push(v);else D.gustos.splice(i,1);render();},
   applyPlan:function(){var a=advice();S.profile.ahorro=a.monthly;if(a.od){var cur=S.plans[a.od.id]||{saved:0};S.plans[a.od.id]=Object.assign(cur,{on:true,target:a.target,months:a.months,saved:cur.saved||0});}save();render();toast('Plan aplicado: apartas '+eur(a.monthly)+' al mes','ok');},
-  reset:function(){if(!resetArmed){resetArmed=true;render();setTimeout(function(){resetArmed=false;render();},4000);return;}resetArmed=false;if(CL())sb.from('perfiles').delete().eq('user_id',cloud.user.id).then(function(){});S=defaults();D=null;try{localStorage.removeItem(KEY);}catch(e){}mem=null;location.hash='';render(false);}
+  reset:function(){if(!resetArmed){resetArmed=true;render();setTimeout(function(){resetArmed=false;render();},4000);return;}resetArmed=false;if(CL())sb.from('perfiles').delete().eq('id',cloud.user.id).then(function(){});S=defaults();D=null;try{localStorage.removeItem(KEY);}catch(e){}mem=null;location.hash='';render(false);}
 };
 function decide(dir){
   var top=$('.swipe-top');if(!top)return;
