@@ -239,12 +239,33 @@ svg.ch .tx.b{fill:var(--ink);font-weight:600}
 .toast.bad{background:var(--bad);color:var(--on-bad)}
 .toast.ok{background:var(--ok);color:var(--on-accent)}
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{transition:none!important;animation:none!important}}
+/* modos extra, pie y grupos */
+:root{--accent-c:#A35A00;--accent-c-soft:#FBEBD0;--accent-u:#7033C9;--accent-u-soft:#EBE0FA;--accent-k:#2A3550;--accent-k-soft:#DDE2EE}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--accent-c:#F0B04A;--accent-c-soft:#3A2C12;--accent-u:#B795F5;--accent-u-soft:#2A1F4A;--accent-k:#C9D3EE;--accent-k-soft:#222C48}}
+:root[data-theme="dark"]{--accent-c:#F0B04A;--accent-c-soft:#3A2C12;--accent-u:#B795F5;--accent-u-soft:#2A1F4A;--accent-k:#C9D3EE;--accent-k-soft:#222C48}
+#app[data-mode="holgado"]{--accent:var(--accent-h);--accent-soft:var(--accent-h-soft)}
+#app[data-mode="normal"]{--accent:var(--accent-a);--accent-soft:var(--accent-a-soft)}
+#app[data-mode="cuidado"]{--accent:var(--accent-c);--accent-soft:var(--accent-c-soft)}
+#app[data-mode="austeridad"]{--accent:var(--accent-u);--accent-soft:var(--accent-u-soft)}
+#app[data-mode="rojo"]{--accent:var(--accent-s);--accent-soft:var(--accent-s-soft)}
+#app[data-mode="supervivencia"]{--accent:var(--accent-k);--accent-soft:var(--accent-k-soft)}
+.seg{overflow-x:auto;scrollbar-width:none}.seg-b{white-space:nowrap}
+.pie-w{display:flex;gap:20px;align-items:center;flex-wrap:wrap}
+.pie{width:150px;height:150px;border-radius:50%;flex:none;position:relative}
+.pie::after{content:"";position:absolute;inset:27%;border-radius:50%;background:var(--surface)}
+.pie-c{position:absolute;inset:0;display:grid;place-content:center;text-align:center;z-index:1}
+.pie-c small{color:var(--muted);font-size:12px}
+.leg{list-style:none;margin:0;padding:0;display:grid;gap:6px;flex:1 1 220px;min-width:0}
+.leg li{display:grid;grid-template-columns:12px minmax(0,1fr) auto auto;gap:8px;align-items:center;font-size:14px}
+.leg i{width:12px;height:12px;border-radius:3px}
+.pos{color:var(--ok)}.neg{color:var(--bad)}
 </style>
 
 <div id="app"></div>
 <div id="sos" class="ov" role="dialog" aria-modal="true" aria-label="Modo Supervivencia" hidden></div>
 <div id="toasts" aria-live="polite"></div>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <script>
 (function(){
 'use strict';
@@ -272,9 +293,12 @@ function getPath(o,path){return path.split('.').reduce(function(a,k){return a==n
 /* ---------- datos ---------- */
 var CATS={comida:{l:'Compra y comida',e:1},transporte:{l:'Transporte',e:1},estudios:{l:'Material y estudios',e:1},salud:{l:'Salud',e:1},fuera:{l:'Comer y beber fuera',e:0},ocio:{l:'Ocio y cultura',e:0},compras:{l:'Compras y ropa',e:0},otros:{l:'Otros',e:0}};
 var MODES={
-  supervivencia:{l:'Supervivencia',d:'Solo lo esencial hasta que acabe el mes.',f:['Tu límite diario se recalcula cada día','Aviso si gastas en ocio, compras o comer fuera','Ayudas urgentes y gratuitas primero','Bloqueo automático de la tarjeta al agotar el presupuesto']},
-  ajustado:{l:'Ajustado',d:'Presupuesto normal con tu ahorro incluido.',f:['Límite diario con tu ahorro mensual ya apartado','Aviso al llegar al 80 % del presupuesto','Ayudas ordenadas por lo bien que encajan contigo','Retos de ahorro con tus amigos']},
-  holgado:{l:'Holgado',d:'Te sobra margen: toca hacerlo rendir.',f:['Te sugerimos apartar parte de lo que sobra','Planes de ahorro a medio plazo primero','Ayudas de estudios, cultura y movilidad','Retos para ahorrar más, no para sobrevivir']}
+  holgado:{l:'Holgado',lvl:0,tol:1.25,d:'Te sobra margen: toca hacerlo rendir.',f:['Te sugerimos apartar parte de lo que sobra','Planes de ahorro a medio plazo primero','Aviso de “vas justo” solo si te pasas un 25 % del ritmo ideal','Retos para ahorrar más, no para sobrevivir']},
+  normal:{l:'Normal',lvl:1,tol:1.1,d:'Presupuesto normal con tu ahorro incluido.',f:['Límite diario con tu ahorro mensual ya apartado','Aviso de “vas justo” si te pasas un 10 % del ritmo ideal','Ayudas ordenadas por lo bien que encajan contigo','Retos de ahorro con tus amigos']},
+  cuidado:{l:'Cuidado',lvl:2,tol:1.05,d:'Vas justo de margen: toca vigilar los caprichos.',f:['Aviso de “vas justo” si te pasas un 5 % del ritmo ideal','Límite diario recalculado cada día','Colchón y fondo de emergencia como planes recomendados','Aviso al llegar al 80 % del presupuesto']},
+  austeridad:{l:'Austeridad',lvl:3,tol:1,d:'Recortamos lo que no es esencial.',f:['Aviso cada vez que apuntas un gasto no esencial','Los gastos no esenciales aparecen como congelados','El asistente te desaconseja las compras no esenciales','Aviso de “vas justo” en cuanto superas el ritmo ideal']},
+  rojo:{l:'Rojo',lvl:4,tol:1,d:'Estás al límite: el presupuesto casi no da para más.',f:['Todo lo de Austeridad','Ayudas urgentes y gratuitas primero','Plan de colchón recomendado','Aviso si superas tu límite de hoy']},
+  supervivencia:{l:'Supervivencia',lvl:5,tol:1,d:'Solo lo esencial hasta que acabe el mes.',f:['Tu límite diario se recalcula cada día','Aviso si gastas en ocio, compras o comer fuera','Ayudas urgentes y gratuitas primero','Bloqueo automático de la tarjeta al agotar el presupuesto']}
 };
 var GUSTOS=[['cine','Cine'],['musica','Música'],['videojuegos','Videojuegos'],['deporte','Deporte'],['viajes','Viajes'],['fiesta','Salir de fiesta'],['cocinar','Cocinar'],['moda','Moda'],['lectura','Lectura'],['tecnologia','Tecnología']];
 var ESTUDIOS=['Bachillerato','FP','Grado','Máster','Doctorado'];
@@ -315,17 +339,21 @@ var PLANES=[
  {id:'viaje',t:'Viaje de fin de carrera',d:'Un viaje con amigos sin tirar de tarjeta.',def:function(){return 900;},steps:['Fija destino y fechas con el grupo','Reparte el coste entre todos','Ahorra una cuota mensual compartida']},
  {id:'portatil',t:'Portátil nuevo',d:'Cambiar de equipo sin pagar a plazos.',def:function(){return 700;},steps:['Mira primero los planes de estudiante','Compara equipos reacondicionados','Compra cuando llegues al objetivo']}
 ];
-var PLAN_REC={supervivencia:['mini'],ajustado:['fondo','piso'],holgado:['piso','viaje','erasmus']};
+var PLAN_REC={holgado:['piso','viaje','erasmus'],normal:['fondo','piso'],cuidado:['mini','fondo'],austeridad:['mini','fondo'],rojo:['mini'],supervivencia:['mini']};
 var IDEAS_GRATIS={cine:'Cine fórum o proyecciones gratuitas de tu facultad',musica:'Conciertos gratis en salas pequeñas y fiestas de barrio',videojuegos:'Juegos gratuitos y partidas en casa con amigos',deporte:'Correr, calistenia o bici por parques',viajes:'Rutas a pie por barrios que no conoces',fiesta:'Quedada en casa con cada uno aportando algo',cocinar:'Cena de táper con amigos',moda:'Intercambio de ropa entre amigos',lectura:'Préstamo de libros en la biblioteca',tecnologia:'Talleres gratuitos y charlas de tu facultad'};
-var SUG=['¿Cuánto puedo gastar hoy?','¿Puedo gastarme 35 € en unas zapatillas?','¿Qué ayudas me corresponden?','Recuérdame pagar el alquiler','Bloquea mi tarjeta','Dame un consejo para ahorrar'];
+var SUG=['¿Cuánto puedo gastar hoy?','¿Puedo gastarme 35 € en unas zapatillas?','¿Qué ayudas me corresponden?','Recuérdame pagar el alquiler','Bloquea mi tarjeta','Dame un consejo para ahorrar','¿Quién me debe dinero?'];
 
 /* ---------- estado ---------- */
 var KEY='finmes.v1';
 var mem=null;
-function defaults(){return {profile:null,mode:'ajustado',gastos:[],saved:[],discarded:[],hist:[],joined:{},events:[],plans:{},card:{blocked:false,auto:true,alertDaily:true,alert80:true},chat:[],sim:null,lastDigest:'',example:false,flags:{}};}
+function defaults(){return {profile:null,mode:'normal',groups:[],gastos:[],saved:[],discarded:[],hist:[],joined:{},events:[],plans:{},card:{blocked:false,auto:true,alertDaily:true,alert80:true},chat:[],sim:null,lastDigest:'',example:false,flags:{}};}
 function load(){try{var r=localStorage.getItem(KEY);if(r)return JSON.parse(r);}catch(e){}return mem;}
 var S=Object.assign(defaults(),load()||{});
 S.card=Object.assign(defaults().card,S.card||{});
+if(!MODES[S.mode])S.mode='normal';
+if(!S.groups)S.groups=[];
+S.chat=(S.chat||[]).filter(function(m){return !m.pending;});
+function lvl(){return MODES[S.mode].lvl;}
 function save(){mem=S;try{localStorage.setItem(KEY,JSON.stringify(S));}catch(e){}}
 var D=null;               // borrador del registro
 var ayFilter='todas';
@@ -349,7 +377,7 @@ function model(){
   var leftToday=allowance-spentToday;
   var ideal=budget*day/n;
   var st='ok';
-  if(budget<=0||remaining<=0)st='bad';else if(spent>ideal*1.1)st='warn';
+  if(budget<=0||remaining<=0)st='bad';else if(spent>ideal*MODES[S.mode].tol)st='warn';
   return {ingresos:ingresos,fijos:fijos,ahorro:ahorro,budget:budget,spent:spent,spentToday:spentToday,remaining:remaining,daysLeft:daysLeft,allowance:allowance,leftToday:leftToday,ideal:ideal,day:day,n:n,y:y,mo:mo,mg:mg,st:st,libre:ingresos-fijos};
 }
 
@@ -372,7 +400,7 @@ function matchOne(a){
 }
 function matchAll(){
   var m=AYUDAS.map(matchOne);
-  var key=function(x){var k=x.score;if(S.mode==='supervivencia'&&(x.a.urg||x.a.gratis))k+=100;if(S.mode==='holgado'&&(x.a.cat==='cultura'||x.a.cat==='estudios'))k+=5;return k+Math.min(x.a.val,3000)/10000;};
+  var key=function(x){var k=x.score;if(lvl()>=4&&(x.a.urg||x.a.gratis))k+=100;if(S.mode==='holgado'&&(x.a.cat==='cultura'||x.a.cat==='estudios'))k+=5;return k+Math.min(x.a.val,3000)/10000;};
   return m.sort(function(a,b){return key(b)-key(a);});
 }
 
@@ -460,7 +488,7 @@ function addGasto(amt,cat,con,pago){
   if(S.card.blocked&&pago==='tarjeta'){toast('Pago rechazado: tu tarjeta está bloqueada. Puedes registrarlo como efectivo.','bad');say('He rechazado un pago de **'+eur(amt,2)+'** porque tu tarjeta está bloqueada.',true);render();return;}
   S.gastos.push({id:uid(),fecha:ymd(new Date()),cat:cat,importe:amt,concepto:con||CATS[cat].l,pago:pago});save();
   var m=model(),c=CATS[cat];
-  if(S.mode==='supervivencia'&&!c.e){toast('Modo Supervivencia: este gasto no es esencial','bad');say('Has apuntado **'+eur(amt,2)+'** en "'+c.l+'". Estás en Modo Supervivencia: intenta posponerlo.',true);}
+  if(lvl()>=3&&!c.e){toast('Modo '+MODES[S.mode].l+': este gasto no es esencial','bad');say('Has apuntado **'+eur(amt,2)+'** en "'+c.l+'". Estás en Modo '+MODES[S.mode].l+': intenta posponerlo.',true);}
   if(S.card.alertDaily&&m.leftToday<0&&before.leftToday>=0){toast('Has pasado tu límite de hoy','bad');say('Has superado tu límite de hoy en **'+eur(-m.leftToday,2)+'**. Mañana tu límite baja a **'+eur(Math.max(0,m.remaining)/Math.max(1,m.daysLeft-1),2)+'**.',true);}
   var pb=before.budget?before.spent/before.budget:0,pa=m.budget?m.spent/m.budget:0;
   if(S.card.alert80&&pa>=.8&&pb<.8&&m.remaining>0){toast('Has gastado el 80 % de tu presupuesto','bad');say('Llevas el **80 %** del presupuesto del mes. Te quedan **'+eur(m.remaining,2)+'** para '+m.daysLeft+' días.',true);}
@@ -474,7 +502,7 @@ function bot(q){
   if(has('bloque')){S.card.blocked=true;save();return {t:'Hecho: he **bloqueado** tu tarjeta (simulación). Podrás seguir apuntando gastos en efectivo.'};}
   if(A!==null&&has('puedo','comprar','gastar','gastarme','me compro','vale la pena')){
     var non=has('cine','copas','fiesta','ropa','zapatillas','cerveza','concierto','videojuego','restaurante','capricho','salir','cena');
-    if(S.mode==='supervivencia'&&non)return {t:'Ahora mismo **no te lo recomiendo**: estás en Modo Supervivencia y eso no es esencial. Si lo quieres de verdad, espera a cobrar.'};
+    if(lvl()>=3&&non)return {t:'Ahora mismo **no te lo recomiendo**: estás en Modo '+MODES[S.mode].l+' y eso no es esencial. Si lo quieres de verdad, espera a cobrar.'};
     if(A<=m.leftToday)return {t:'**Sí**, entra en tu límite de hoy. Te quedarían **'+eur(m.leftToday-A,2)+'** para hoy.'};
     if(A<=m.remaining){var np=(m.remaining-A)/Math.max(1,m.daysLeft-1);return {t:'Entra en el mes, pero **te pasas '+eur(A-m.leftToday,2)+'** de tu límite de hoy. Si lo compras, tu límite diario baja a **'+eur(np,2)+'** el resto del mes.'};}
     return {t:'**No**: supera lo que te queda del mes ('+eur(m.remaining,2)+'). Si es necesario, mira las ayudas de urgencia.',acts:[{l:'Ver ayudas',h:'#ayudas'}]};
@@ -486,6 +514,7 @@ function bot(q){
     return {t:'Listo. Te lo he puesto en el calendario para mañana: **'+ev.title+'**.',acts:[{l:'Añadir a Google Calendar',h:gcalUrl(ev),ext:1},{l:'Ver calendario',h:'#calendario'}]};
   }
   if(has('supervivencia','sin dinero','emergencia')||/\bsos\b/.test(t)){setTimeout(openSOS,60);return {t:'Abro el Modo Supervivencia con lo esencial para lo que queda de mes.'};}
+  if(has('me debe','te debo','debo a','grupo','tricount','deudas'))return groupBot();
   if(has('ayuda','beca','subvenc','cupon','oferta','descuento','bono')){
     var top=matchAll().slice(0,3);
     return {t:'Estas son las que mejor encajan contigo ahora:\n'+top.map(function(x){return '• **'+x.a.t+'** ('+x.score+' %)';}).join('\n'),acts:[{l:'Abrir ayudas',h:'#ayudas'}]};
@@ -498,7 +527,7 @@ function bot(q){
   if(has('plan')){return {t:'Según tu modo ('+MODES[S.mode].l+'), te recomiendo: '+PLAN_REC[S.mode].map(function(id){return PLANES.filter(function(p){return p.id===id;})[0].t;}).join(', ')+'.',acts:[{l:'Ver planes',h:'#planes'}]};}
   if(has('ahorr','consejo','truco')){
     var tips={supervivencia:['Cocina por lotes el domingo y congela raciones.','Pausa todas las suscripciones hasta que cobres.','Pide en el comedor universitario en vez de comprar fuera.'],ajustado:['Transfiere tu ahorro el día que cobras, no al final de mes.','Revisa tus suscripciones: ¿usas todas?','Prueba la regla de las 48 horas antes de comprar.'],holgado:['Aparta un 20 % de lo que te sobra a un plan con meta.','Revisa si tienes descuentos de estudiante sin usar.','Mantén un fondo de tres meses antes de gastar en caprichos.']};
-    var arr=tips[S.mode];return {t:'Un consejo para tu modo: '+arr[Math.floor(Math.random()*arr.length)]};
+    tips.normal=tips.cuidado=tips.ajustado;tips.austeridad=tips.rojo=tips.supervivencia;var arr=tips[S.mode];return {t:'Un consejo para tu modo: '+arr[Math.floor(Math.random()*arr.length)]};
   }
   if(has('hoy','cuanto','saldo','queda','presupuesto','limite')){
     return {t:'Hoy puedes gastar **'+eur(m.leftToday,2)+'**. Te quedan **'+eur(m.remaining,2)+'** del presupuesto de este mes para '+m.daysLeft+' días.'};
@@ -508,7 +537,135 @@ function bot(q){
 }
 
 /* ---------- vistas ---------- */
-var TABS=[['inicio','Inicio'],['ayudas','Ayudas'],['calendario','Calendario'],['retos','Retos'],['emancipacion','Emancipación'],['planes','Planes'],['asistente','Asistente']];
+/* ---------- grupos (estilo Tricount) ---------- */
+var gSel=null,ME='Tú';
+function cents(x){return Math.round(x*100);}
+function gBal(g){
+  var b={};g.members.forEach(function(n){b[n]=0;});
+  g.exp.forEach(function(e){var c=cents(e.amt),k=e.split.length,base=Math.floor(c/k),rem=c-base*k;b[e.payer]+=c;e.split.forEach(function(w,i){b[w]-=base+(i<rem?1:0);});});
+  g.paid.forEach(function(p){b[p.from]+=cents(p.amt);b[p.to]-=cents(p.amt);});
+  return b;
+}
+function gDebts(g){
+  var b=gBal(g),cr=[],de=[],out=[],i=0,j=0;
+  Object.keys(b).forEach(function(n){if(b[n]>0)cr.push([n,b[n]]);else if(b[n]<0)de.push([n,-b[n]]);});
+  cr.sort(function(a,c){return c[1]-a[1];});de.sort(function(a,c){return c[1]-a[1];});
+  while(i<de.length&&j<cr.length){var a=Math.min(de[i][1],cr[j][1]);out.push({from:de[i][0],to:cr[j][0],c:a});de[i][1]-=a;cr[j][1]-=a;if(de[i][1]===0)i++;if(cr[j][1]===0)j++;}
+  return out;
+}
+/* ---------- nube (Supabase) ---------- */
+var SB_URL='',SB_KEY='';   /* pega aquí la URL y la anon key de tu proyecto de Supabase */
+var sb=(SB_URL&&SB_KEY&&window.supabase)?window.supabase.createClient(SB_URL,SB_KEY):null;
+var cloud={user:null,groups:[],err:''};
+function CL(){return !!(sb&&cloud.user);}
+function gl(){return CL()?cloud.groups:S.groups;}
+async function cloudLoad(){
+  var r=await sb.from('grupos').select('id,nombre,codigo,grupo_miembros(id,nombre,user_id),grupo_gastos(id,concepto,importe_cents,pagador_id,fecha,grupo_reparto(miembro_id)),grupo_pagos(de_id,a_id,importe_cents)').order('created_at');
+  if(r.error){cloud.err=r.error.message;return;}
+  cloud.err='';
+  cloud.groups=r.data.map(function(g){
+    var nm={},ids={};
+    g.grupo_miembros.forEach(function(m){nm[m.id]=(m.user_id&&m.user_id===cloud.user.id)?ME:m.nombre;ids[nm[m.id]]=m.id;});
+    return {id:g.id,name:g.nombre,code:g.codigo,ids:ids,members:g.grupo_miembros.map(function(m){return nm[m.id];}),
+      exp:g.grupo_gastos.map(function(e){return {id:e.id,what:e.concepto,amt:e.importe_cents/100,payer:nm[e.pagador_id],split:e.grupo_reparto.map(function(x){return nm[x.miembro_id];}),date:e.fecha};}),
+      paid:g.grupo_pagos.map(function(p){return {from:nm[p.de_id],to:nm[p.a_id],amt:p.importe_cents/100};})};
+  });
+}
+async function cloudDo(fn,ok){
+  try{var r=await fn();if(r&&r.error)throw r.error;await cloudLoad();render();if(ok)toast(ok,'ok');}
+  catch(e){toast('Error en la nube: '+(e.message||e),'bad');}
+}
+async function cloudAuth(mode,em,pw){
+  if(!em||pw.length<6){toast('Escribe un email y una contraseña de 6 caracteres o más','bad');return;}
+  try{
+    var r=mode==='up'?await sb.auth.signUp({email:em,password:pw}):await sb.auth.signInWithPassword({email:em,password:pw});
+    if(r.error)throw r.error;
+    if(!r.data.session){toast('Revisa tu correo para confirmar la cuenta y vuelve a entrar','ok');return;}
+    cloud.user=r.data.user;await cloudLoad();render();toast('Sesión iniciada','ok');
+  }catch(e){toast(e.message||'No se pudo entrar','bad');}
+}
+async function cloudInit(){
+  if(!sb)return;
+  try{var r=await sb.auth.getSession();cloud.user=r.data.session?r.data.session.user:null;if(cloud.user)await cloudLoad();render();}catch(e){cloud.err=String(e.message||e);}
+}
+function cloudNewGroup(name,ms){
+  var seen={};ms=ms.filter(function(n){if(n===ME||seen[n])return false;seen[n]=1;return true;});
+  cloudDo(async function(){
+    var g=await sb.from('grupos').insert({nombre:name}).select('id').single();if(g.error)return g;
+    gSel=g.data.id;
+    var rows=[{grupo_id:g.data.id,user_id:cloud.user.id,nombre:S.profile.nombre}].concat(ms.map(function(n){return {grupo_id:g.data.id,nombre:n};}));
+    return sb.from('grupo_miembros').insert(rows);
+  },'Grupo creado');
+}
+function cloudAddExp(g,what,amt,payer,split){
+  cloudDo(async function(){
+    var e=await sb.from('grupo_gastos').insert({grupo_id:g.id,concepto:what,importe_cents:cents(amt),pagador_id:g.ids[payer]}).select('id').single();if(e.error)return e;
+    return sb.from('grupo_reparto').insert(split.map(function(n){return {gasto_id:e.data.id,miembro_id:g.ids[n]};}));
+  },'Gasto añadido');
+}
+/* ---------- asistente con Claude (vía Edge Function) ---------- */
+function AI_ON(){return CL();}
+function isCmd(q){return /bloque|recuerda|recordatorio|avisame|supervivencia|sin dinero|\bsos\b/.test(norm(q));}
+function aiContext(){
+  var m=model(),p=S.profile,r2=function(x){return Math.round((+x||0)*100)/100;},deu=[];
+  gl().forEach(function(g){gDebts(g).forEach(function(d){if(d.to===ME)deu.push(d.from+' te debe '+r2(d.c/100)+' € ('+g.name+')');else if(d.from===ME)deu.push('Debes '+r2(d.c/100)+' € a '+d.to+' ('+g.name+')');});});
+  return {fecha:ymd(new Date()),nombre:p.nombre,edad:p.edad,estudios:p.estudios,prefijo_cp:String(p.cp||'').slice(0,2),vivienda:p.vivienda,gustos:p.gustos||[],modo:MODES[S.mode].l,ingresos_mes:r2(m.ingresos),gastos_fijos:r2(m.fijos),ahorro_mensual:r2(m.ahorro),presupuesto_variable_mes:r2(m.budget),gastado_este_mes:r2(m.spent),queda_este_mes:r2(m.remaining),dias_restantes:m.daysLeft,limite_hoy:r2(m.leftToday),ayudas_que_encajan:matchAll().slice(0,5).map(function(x){return {titulo:x.a.t,encaje_pct:x.score,plazo:x.a.plazo};}),deudas_en_grupos:deu,planes_activos:PLANES.filter(function(pl){return S.plans[pl.id]&&S.plans[pl.id].on;}).map(function(pl){return pl.t;})};
+}
+async function aiAsk(text){
+  S.chat.push({r:'a',t:'Pensando…',pending:true,acts:[]});render();
+  var out,acts=[];
+  try{
+    var ses=await sb.auth.getSession(),tok=ses.data.session.access_token;
+    var hist=S.chat.filter(function(x){return !x.pending;}).slice(-12).map(function(x){return {role:x.r==='u'?'user':'assistant',content:x.t};});
+    var res=await fetch(SB_URL+'/functions/v1/chat',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+tok,apikey:SB_KEY},body:JSON.stringify({messages:hist,context:aiContext()})});
+    var j=await res.json();if(!res.ok)throw new Error(j.error||'Error del asistente');out=j.reply;
+  }catch(e){var f=bot(text);out=f.t+'\n(No he podido contactar con la IA: '+(e.message||e)+'. Te respondo con el modo básico.)';acts=f.acts||[];}
+  S.chat=S.chat.filter(function(x){return !x.pending;});
+  S.chat.push({r:'a',t:out,acts:acts});if(S.chat.length>60)S.chat.shift();save();render();
+  var i=$('#chat-in');if(i&&curView()==='asistente')i.focus();
+}
+function cloudPanel(){
+  if(!sb)return '<section class="panel"><h2>Cuentas en la nube</h2><p class="hint">Ahora mismo los grupos se guardan solo en este navegador. Para compartirlos con amigos, configura Supabase (pasos en el README).</p></section>';
+  if(!cloud.user)return '<form class="panel" data-form="auth"><h2>Entra para compartir grupos</h2><label class="f"><span>Email</span><input id="au-mail" type="email" required autocomplete="email"></label><label class="f"><span>Contraseña</span><input id="au-pass" type="password" minlength="6" required autocomplete="current-password"></label><div class="row"><button class="btn primary" type="submit">Entrar</button><button class="btn" type="button" data-act="signup">Crear cuenta</button></div></form>';
+  return '<section class="panel"><h2>Cuentas en la nube<span class="pill ok">Sincronizado</span></h2><p class="hint">'+esc(cloud.user.email||'')+'</p>'+(cloud.err?'<p class="hint">'+esc(cloud.err)+'</p>':'')+'<form data-form="join" class="row"><label class="f grow"><span>Unirte con un código</span><input id="jn-code" type="text" maxlength="12" required></label><button class="btn" type="submit">Unirme</button></form><button class="btn sm ghost" data-act="signout">Cerrar sesión</button></section>';
+}
+function gExample(){
+  var all=[ME,'Lucía','Marcos','Aitana'];
+  function e(w,a,p,sp){return {id:uid(),what:w,amt:a,payer:p,split:sp||all.slice(),date:ymd(new Date())};}
+  return {id:uid(),name:'Viaje a Roma',members:all.slice(),exp:[e('Vuelos',240,ME),e('Apartamento',380,'Lucía'),e('Cena en Trastevere',64,'Marcos',[ME,'Marcos','Aitana']),e('Metro y bus',30,'Aitana')],paid:[]};
+}
+function groupBot(){
+  if(!gl().length)return {t:'Todavía no tienes grupos. Crea uno para repartir gastos con tus amigos.',acts:[{l:'Abrir grupos',h:'#grupos'}]};
+  var L=[];gl().forEach(function(g){gDebts(g).forEach(function(d){if(d.to===ME)L.push('• **'+d.from+'** te debe **'+eur(d.c/100,2)+'** ('+g.name+')');else if(d.from===ME)L.push('• Debes **'+eur(d.c/100,2)+'** a **'+d.to+'** ('+g.name+')');});});
+  return {t:L.length?'Así están tus cuentas en grupos:\n'+L.join('\n'):'Estás al día en todos tus grupos.',acts:[{l:'Abrir grupos',h:'#grupos'}]};
+}
+function vGrupos(){
+  var gs=gl();
+  if(!gs.some(function(x){return x.id===gSel;}))gSel=gs.length?gs[0].id:null;
+  var g=gs.filter(function(x){return x.id===gSel;})[0];
+  var chk=function(name,list,def){return list.map(function(n,i){return '<label class="sw"><input type="checkbox" name="'+name+'" value="'+esc(n)+'"'+(def(i)?' checked':'')+'>'+esc(n)+'</label>';}).join('');};
+  var form='<form class="panel" data-form="grupo"><h2>Nuevo grupo</h2><label class="f"><span>Nombre</span><input name="name" type="text" maxlength="40" required placeholder="Acampada en Vitoria"></label><div class="chips">'+chk('m',AMIGOS,function(i){return i<2;})+'</div><label class="f"><span>Otra persona (opcional)</span><input name="extra" type="text" maxlength="20"></label><button class="btn primary" type="submit">Crear grupo</button></form>';
+  var side='<div class="col">'+cloudPanel()+'<section class="panel"><h2>Tus grupos<span class="num">'+gs.length+'</span></h2>'+(gs.length?'<div class="chips">'+gs.map(function(x){return '<button class="chip" data-act="gSel" data-id="'+x.id+'" aria-pressed="'+(x.id===gSel)+'">'+esc(x.name)+'</button>';}).join('')+'</div>':'<p class="hint">Crea un grupo para repartir los gastos de un viaje, un piso o una comida.</p>')+(CL()?'':'<button class="btn" data-act="gExample">Cargar grupo de ejemplo</button>')+'</section>'+form+'</div>';
+  var main;
+  if(!g)main='<section class="panel"><h2>Cuentas en grupo</h2><p class="hint">Aquí verás quién ha pagado qué y quién debe a quién. Prueba con el grupo de ejemplo o crea el tuyo.</p></section>';
+  else{
+    var b=gBal(g),mine=b[ME]||0,ds=gDebts(g),tot=g.exp.reduce(function(a,e){return a+e.amt;},0);
+    var dl=ds.map(function(d){
+      var amt=eur(d.c/100,2),at='data-g="'+g.id+'" data-from="'+esc(d.from)+'" data-to="'+esc(d.to)+'" data-c="'+d.c+'"';
+      var txt=d.to===ME?'<strong>'+esc(d.from)+'</strong> te debe':d.from===ME?'Debes a <strong>'+esc(d.to)+'</strong>':'<strong>'+esc(d.from)+'</strong> debe a <strong>'+esc(d.to)+'</strong>';
+      var msg='Oye '+d.from+', me debes '+amt+' de "'+g.name+'". ¿Me lo pasas por Bizum? 😅';
+      var acts=d.to===ME?'<button class="btn sm" data-act="nudge" data-t="'+esc(msg)+'" data-who="'+esc(d.from)+'">Recordar</button><a class="btn sm ghost" target="_blank" rel="noopener" href="https://wa.me/?text='+encodeURIComponent(msg)+'">WhatsApp</a>':'';
+      return '<li><span class="l">'+txt+'<small class="num">'+amt+'</small></span><span class="row">'+acts+'<button class="btn sm ghost" data-act="settle" '+at+'>'+(d.to===ME?'Ya me pagó':d.from===ME?'Ya pagué':'Pagado')+'</button></span></li>';
+    }).join('');
+    main='<section class="panel"><h2>'+esc(g.name)+'<button class="btn sm ghost danger" data-act="gDel" data-id="'+g.id+'">Borrar grupo</button></h2><div class="chips">'+g.members.map(function(n){return '<span class="chip tag">'+esc(n)+'</span>';}).join('')+'</div>'+(g.code?'<p class="hint">Código para invitar: <strong class="num">'+esc(g.code)+'</strong></p>':'')+'<p class="hint">Gasto total: <strong class="num">'+eur(tot,2)+'</strong>. Tu saldo: <strong class="num '+(mine>=0?'pos':'neg')+'">'+(mine>=0?'+':'−')+eur(Math.abs(mine)/100,2)+'</strong></p></section>'+
+    '<section class="panel"><h2>Quién debe a quién</h2>'+(dl?'<ul class="list">'+dl+'</ul>':'<span class="pill ok">Todo saldado</span>')+'</section>'+
+    '<form class="panel" data-form="gexp" data-g="'+g.id+'"><h2>Añadir gasto</h2><div class="qa-row"><label class="f grow"><span>Concepto</span><input name="what" type="text" maxlength="40" required placeholder="Cena, gasolina, entradas..."></label><label class="f"><span>Importe (€)</span><input name="amt" type="number" inputmode="decimal" step="0.01" min="0.01" required></label><label class="f"><span>Pagó</span><select name="payer">'+g.members.map(function(n){return '<option>'+esc(n)+'</option>';}).join('')+'</select></label></div><p class="hint">Se reparte a partes iguales entre:</p><div class="chips">'+chk('w',g.members,function(){return true;})+'</div><button class="btn primary" type="submit">Añadir gasto</button></form>'+
+    '<section class="panel"><h2>Gastos<span class="num">'+g.exp.length+'</span></h2>'+(g.exp.length?'<ul class="list">'+g.exp.slice().reverse().map(function(e){return '<li><span class="l">'+esc(e.what)+'<small>Pagó '+esc(e.payer)+' · entre '+e.split.length+'</small></span><span class="row"><span class="num">'+eur(e.amt,2)+'</span><button class="btn sm ghost" data-act="gExpDel" data-g="'+g.id+'" data-id="'+e.id+'">Quitar</button></span></li>';}).join('')+'</ul>':'<p class="hint">Aún no hay gastos.</p>')+'</section>';
+  }
+  return '<div><h1>Grupos</h1><p class="sub">Reparte gastos con tus amigos y recuérdales lo que te deben.</p></div><div class="cols"><div class="col">'+main+'</div>'+side+'</div>';
+}
+
+var TABS=[['inicio','Inicio'],['ayudas','Ayudas'],['calendario','Calendario'],['retos','Retos'],['grupos','Grupos'],['emancipacion','Emancipación'],['planes','Planes'],['asistente','Asistente']];
 function curView(){var h=location.hash.slice(1);return VIEWS[h]?h:'inicio';}
 function fmt(t){return esc(t).replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').replace(/\n/g,'<br>');}
 function statusPill(m){return m.st==='ok'?'<span class="pill ok">En ritmo</span>':m.st==='warn'?'<span class="pill warn">Vas justo</span>':'<span class="pill bad">'+(m.budget<=0?'Sin margen':'Presupuesto agotado')+'</span>';}
@@ -555,11 +712,17 @@ function chartSpend(m){
   '<circle cx="'+X(last[0]).toFixed(1)+'" cy="'+Y(last[1]).toFixed(1)+'" r="5" fill="var(--accent)" stroke="var(--surface)" stroke-width="2"/></svg>'+
   '<div class="legend"><span><i></i>Lo que llevas gastado</span><span><i class="d"></i>Ritmo ideal para llegar a fin de mes</span><span>Eje horizontal: día del mes</span></div></section>';
 }
+var PIEC=['#2B6CF0','#0A8F66','#E0A100','#D8381B','#7A3FD1','#E1599B','#13A3B8','#7A8499','#8C5A2B','#4C9A2A','#C2410C','#0F766E','#6D28D9'];
 function catsHtml(m){
+  var p=S.profile,FL={vivienda:'Vivienda',transporte:'Transporte (fijo)',movil:'Móvil',suscripciones:'Suscripciones',otros:'Otros fijos'},sl=[];
+  Object.keys(p.gastos||{}).forEach(function(k){var v=+p.gastos[k]||0;if(v>0)sl.push({l:FL[k]||k,v:v});});
   var by={};m.mg.forEach(function(g){by[g.cat]=(by[g.cat]||0)+g.importe;});
-  var ks=Object.keys(CATS).filter(function(k){return by[k];}).sort(function(a,b){return by[b]-by[a];});
-  var mx=Math.max.apply(null,ks.map(function(k){return by[k];}).concat([1]));
-  return '<section class="panel"><h2>En qué se va el dinero</h2>'+(ks.length?'<div class="bars">'+ks.map(function(k){var frz=S.mode==='supervivencia'&&!CATS[k].e;return '<div class="bar-r"><span>'+CATS[k].l+(frz?' <span class="pill bad">Congelado</span>':'')+'</span><span class="bar-t"><i class="'+(frz?'frz':'')+'" style="width:'+(by[k]/mx*100).toFixed(0)+'%"></i></span><span class="num" style="text-align:right">'+eur(by[k],2)+'</span></div>';}).join('')+'</div>':'<p class="hint">Cuando apuntes gastos verás aquí cómo se reparten.</p>')+'</section>';
+  Object.keys(CATS).forEach(function(k){if(by[k])sl.push({l:CATS[k].l,v:by[k],k:k});});
+  if(m.ahorro>0)sl.push({l:'Ahorro',v:m.ahorro});
+  var tot=sl.reduce(function(a,x){return a+x.v;},0);
+  if(!tot)return '<section class="panel"><h2>El pie de tu mes</h2><p class="hint">Cuando apuntes gastos verás aquí cómo se reparte tu dinero.</p></section>';
+  var acc=0,stops=sl.map(function(x,i){var a=acc/tot*360;acc+=x.v;return PIEC[i%PIEC.length]+' '+a.toFixed(1)+'deg '+(acc/tot*360).toFixed(1)+'deg';}).join(',');
+  return '<section class="panel"><h2>El pie de tu mes<span class="hint">'+MESES[m.mo]+'</span></h2><div class="pie-w"><div class="pie" role="img" aria-label="Gráfico circular con el reparto de tu mes" style="background:conic-gradient('+stops+')"><span class="pie-c"><strong class="num">'+eur(tot)+'</strong><small>en total</small></span></div><ul class="leg">'+sl.map(function(x,i){var frz=x.k&&lvl()>=3&&!CATS[x.k].e;return '<li><i style="background:'+PIEC[i%PIEC.length]+'"></i><span>'+esc(x.l)+(frz?' <span class="pill bad">Congelado</span>':'')+'</span><span class="num">'+Math.round(x.v/tot*100)+' %</span><span class="num">'+eur(x.v,2)+'</span></li>';}).join('')+'</ul></div><p class="hint">Gastos fijos, lo que llevas gastado este mes y tu ahorro.</p></section>';
 }
 function cardPanel(){
   var b=S.card.blocked;
@@ -574,7 +737,7 @@ function cardPanel(){
 function modeNotes(m){
   var M=MODES[S.mode],extra='';
   if(S.mode==='holgado'&&m.remaining>0)extra='<p class="hint">Sugerencia: aparta <strong>'+eur(m.remaining*0.2)+'</strong> (el 20 % de lo que te queda) a un plan.</p>';
-  if(S.mode==='supervivencia')extra='<p class="hint">Gasto no esencial este mes: <strong>'+eur(m.mg.filter(function(g){return !CATS[g.cat].e;}).reduce(function(a,g){return a+g.importe;},0),2)+'</strong>.</p>';
+  if(lvl()>=3)extra='<p class="hint">Gasto no esencial este mes: <strong>'+eur(m.mg.filter(function(g){return !CATS[g.cat].e;}).reduce(function(a,g){return a+g.importe;},0),2)+'</strong>.</p>';
   return '<section class="panel"><h2>Modo '+M.l+'</h2><p class="hint">'+M.d+'</p><ul class="chk">'+M.f.map(function(x){return '<li class="y"><b aria-hidden="true">✓</b><span>'+x+'</span></li>';}).join('')+'</ul>'+extra+'</section>';
 }
 function upcomingHtml(){
@@ -768,7 +931,7 @@ function vOnboard(){
   return '<div class="wrap ob"><div class="steps" aria-hidden="true">'+titles.map(function(_,i){return '<i class="'+(i<=st?'on':'')+'"></i>';}).join('')+'</div><div><p class="hint num">Paso '+(st+1)+' de 5</p><h1 style="font-size:clamp(26px,4vw,36px)">'+titles[st]+'</h1></div>'+body+(d.err?'<p class="err" role="alert">'+esc(d.err)+'</p>':'')+
   '<div class="row">'+(st>0?'<button class="btn" data-act="obBack">Atrás</button>':'<button class="btn ghost" data-act="obCancel">Volver</button>')+(st<4?'<button class="btn primary" data-act="obNext">Siguiente</button>':'<button class="btn primary" data-act="obFinish">Terminar</button>')+'</div></div>';
 }
-var VIEWS={inicio:vInicio,ayudas:vAyudas,calendario:vCalendario,retos:vRetos,emancipacion:vEmancipacion,planes:vPlanes,asistente:vAsistente};
+var VIEWS={inicio:vInicio,ayudas:vAyudas,calendario:vCalendario,retos:vRetos,grupos:vGrupos,emancipacion:vEmancipacion,planes:vPlanes,asistente:vAsistente};
 
 /* ---------- SOS ---------- */
 function openSOS(){
@@ -794,7 +957,7 @@ function closeSOS(){$('#sos').hidden=true;}
 /* ---------- render ---------- */
 function render(keep){
   var y=window.scrollY,app=$('#app'),view=curView();
-  if(!S.profile){app.dataset.mode='ajustado';app.innerHTML=D?vOnboard():vWelcome();if(keep===false)window.scrollTo(0,0);else window.scrollTo(0,y);return;}
+  if(!S.profile){app.dataset.mode='normal';app.innerHTML=D?vOnboard():vWelcome();if(keep===false)window.scrollTo(0,0);else window.scrollTo(0,y);return;}
   app.dataset.mode=S.mode;
   app.innerHTML='<header class="top"><div class="wrap topin"><a class="brand" href="#inicio">Fin de <span class="hl">Mes</span></a><div class="seg" role="group" aria-label="Modo de gasto">'+Object.keys(MODES).map(function(k){return '<button class="seg-b" data-act="mode" data-v="'+k+'" aria-pressed="'+(S.mode===k)+'">'+MODES[k].l+'</button>';}).join('')+'</div><button class="btn sos sm" data-act="sos">SOS fin de mes</button></div><nav class="wrap tabs" aria-label="Secciones">'+TABS.map(function(t){return '<a class="tab" href="#'+t[0]+'" aria-current="'+(view===t[0]?'page':'false')+'">'+t[1]+'</a>';}).join('')+'</nav></header>'+
   '<main class="wrap main" id="main">'+VIEWS[view]()+'</main>'+
@@ -830,9 +993,17 @@ var ACT={
   planOn:function(el){var d=PLANES.filter(function(p){return p.id===el.dataset.id;})[0],i=planInfo(d);S.plans[d.id]={on:true,target:i.target,monthly:i.monthly,saved:i.saved};save();render();toast('Plan activado','ok');},
   planOff:function(el){S.plans[el.dataset.id].on=false;save();render();},
   aporta:function(el){var p=S.plans[el.dataset.id];p.saved+=+el.dataset.v;save();render();toast('Aportación apuntada','ok');},
+  signup:function(){cloudAuth('up',$('#au-mail').value.trim(),$('#au-pass').value);},
+  signout:function(){sb.auth.signOut().then(function(){cloud.user=null;cloud.groups=[];render();toast('Sesión cerrada','ok');});},
+  gSel:function(el){gSel=el.dataset.id;render();},
+  gExample:function(){var g=gExample();S.groups.push(g);gSel=g.id;save();render();toast('Grupo de ejemplo creado','ok');},
+  gDel:function(el){if(CL()){cloudDo(function(){return sb.from('grupos').delete().eq('id',el.dataset.id);});return;}S.groups=S.groups.filter(function(x){return x.id!==el.dataset.id;});save();render();},
+  gExpDel:function(el){if(CL()){cloudDo(function(){return sb.from('grupo_gastos').delete().eq('id',el.dataset.id);});return;}var g=S.groups.filter(function(x){return x.id===el.dataset.g;})[0];if(g){g.exp=g.exp.filter(function(e){return e.id!==el.dataset.id;});save();render();}},
+  settle:function(el){if(CL()){var cg=cloud.groups.filter(function(x){return x.id===el.dataset.g;})[0];if(cg)cloudDo(function(){return sb.from('grupo_pagos').insert({grupo_id:cg.id,de_id:cg.ids[el.dataset.from],a_id:cg.ids[el.dataset.to],importe_cents:+el.dataset.c});},'Pago apuntado');return;}var g=S.groups.filter(function(x){return x.id===el.dataset.g;})[0];if(g){g.paid.push({from:el.dataset.from,to:el.dataset.to,amt:(+el.dataset.c)/100});save();render();toast('Pago apuntado','ok');}},
+  nudge:function(el){copy(el.dataset.t,'Toque a '+el.dataset.who+' enviado: mensaje copiado (simulación)');},
   ask:function(el){send(el.dataset.q);},
   obStart:function(){D=blank();render(false);},
-  example:function(){S.profile=exampleProfile();S.example=true;S.gastos=exampleGastos();S.mode='ajustado';S.chat=[];save();digest();location.hash='#inicio';render(false);},
+  example:function(){S.profile=exampleProfile();S.example=true;S.gastos=exampleGastos();S.mode='normal';S.chat=[];save();digest();location.hash='#inicio';render(false);},
   obCancel:function(){D=null;render(false);},
   obBack:function(){D.err='';D.step--;render(false);},
   obNext:function(){var e=validate(D);D.err=e;if(!e)D.step++;render(false);},
@@ -872,7 +1043,7 @@ function exampleGastos(){
 }
 function send(text){
   text=String(text||'').trim();if(!text)return;
-  S.chat.push({r:'u',t:text});var r=bot(text);S.chat.push({r:'a',t:r.t,acts:r.acts||[]});save();
+  S.chat.push({r:'u',t:text});if(AI_ON()&&!isCmd(text)){aiAsk(text);return;}var r=bot(text);S.chat.push({r:'a',t:r.t,acts:r.acts||[]});save();
   if(curView()!=='asistente'){render();return;}
   render();var i=$('#chat-in');if(i)i.focus();
 }
@@ -887,6 +1058,10 @@ document.addEventListener('submit',function(e){
   var k=f.dataset.form;
   if(k==='gasto'){var a=num($('#qa-amt').value);if(!a){toast('Escribe un importe mayor que cero','bad');return;}addGasto(a,$('#qa-cat').value,$('#qa-con').value.trim(),$('#qa-pay').value);}
   if(k==='evento'){var t=$('#ev-title').value.trim(),dt=$('#ev-date').value;if(!t||!dt)return;S.events.push({id:uid(),title:t,date:dt,kind:$('#ev-kind').value,amt:num($('#ev-amt').value),guests:$('#ev-guests').value.trim().replace(/\s+/g,'')});calSel=dt;var p=parse(dt);calCur={y:p.getFullYear(),m:p.getMonth()};save();render();toast('Evento guardado','ok');}
+  if(k==='auth'){cloudAuth('in',$('#au-mail').value.trim(),$('#au-pass').value);return;}
+  if(k==='join'){var jc=$('#jn-code').value.trim().toLowerCase();cloudDo(function(){return sb.rpc('unirse_grupo',{cod:jc,mi_nombre:S.profile.nombre});},'Te has unido al grupo');return;}
+  if(k==='grupo'){var fd=new FormData(f),gn=String(fd.get('name')||'').trim(),ms=fd.getAll('m').map(String),gx=String(fd.get('extra')||'').trim().slice(0,20);if(!gn){toast('Ponle un nombre al grupo','bad');return;}if(gx&&gx!==ME&&ms.indexOf(gx)<0)ms.push(gx);if(CL()){cloudNewGroup(gn.slice(0,40),ms);return;}var ng={id:uid(),name:gn.slice(0,40),members:[ME].concat(ms),exp:[],paid:[]};S.groups.push(ng);gSel=ng.id;save();render();toast('Grupo creado','ok');return;}
+  if(k==='gexp'){var fe=new FormData(f),ge=gl().filter(function(x){return x.id===f.dataset.g;})[0],ga=num(fe.get('amt')),gw=fe.getAll('w').map(String),gt=String(fe.get('what')||'').trim();if(!ge||!ga||!gw.length||!gt){toast('Escribe concepto, importe y con quién se reparte','bad');return;}if(CL()){cloudAddExp(ge,gt.slice(0,40),ga,String(fe.get('payer')),gw);return;}ge.exp.push({id:uid(),what:gt.slice(0,40),amt:ga,payer:String(fe.get('payer')),split:gw,date:ymd(new Date())});save();render();toast('Gasto añadido','ok');return;}
   if(k==='chat'){var i=$('#chat-in');var v=i.value;i.value='';send(v);}
 });
 function onInput(e){
@@ -926,6 +1101,7 @@ document.addEventListener('pointercancel',endDrag);
 /* ---------- arranque ---------- */
 if(S.profile)digest();
 render(false);
+cloudInit();
 })();
 </script>
 
