@@ -1,0 +1,883 @@
+/* ---------- utilidades ---------- */
+var $=function(s,r){return (r||document).querySelector(s);};
+var $$=function(s,r){return Array.prototype.slice.call((r||document).querySelectorAll(s));};
+var esc=function(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});};
+var nf0=new Intl.NumberFormat('es-ES',{style:'currency',currency:'EUR',maximumFractionDigits:0});
+var nf2=new Intl.NumberFormat('es-ES',{style:'currency',currency:'EUR',minimumFractionDigits:2,maximumFractionDigits:2});
+var eur=function(n,d){n=Math.round((+n||0)*100)/100;return (d===2?nf2:nf0).format(n);};
+var pad=function(n){return String(n).padStart(2,'0');};
+var ymd=function(d){return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());};
+var parse=function(s){var a=s.split('-').map(Number);return new Date(a[0],a[1]-1,a[2]);};
+var addDays=function(d,n){var x=new Date(d);x.setDate(x.getDate()+n);return x;};
+var dim=function(y,m){return new Date(y,m+1,0).getDate();};
+var uid=function(){return Math.random().toString(36).slice(2,9);};
+var sumObj=function(o){return Object.keys(o||{}).reduce(function(a,k){return a+(+o[k]||0);},0);};
+var num=function(v){var x=parseFloat(String(v).replace(',','.'));return isFinite(x)&&x>0?x:0;};
+var norm=function(s){return String(s).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');};
+var MESES=['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+var hash=function(s){var h=0;for(var i=0;i<s.length;i++){h=(h*31+s.charCodeAt(i))>>>0;}return h;};
+function setPath(o,path,v){var k=path.split('.'),c=o;for(var i=0;i<k.length-1;i++){c=c[k[i]]=c[k[i]]||{};}c[k[k.length-1]]=v;}
+function getPath(o,path){return path.split('.').reduce(function(a,k){return a==null?a:a[k];},o);}
+
+/* ---------- datos ---------- */
+var CATS={comida:{l:'Compra y comida',e:1},transporte:{l:'Transporte',e:1},estudios:{l:'Material y estudios',e:1},salud:{l:'Salud',e:1},fuera:{l:'Comer y beber fuera',e:0},ocio:{l:'Ocio y cultura',e:0},compras:{l:'Compras y ropa',e:0},otros:{l:'Otros',e:0}};
+var MODES={
+  holgado:{l:'Holgado',lvl:0,tol:1.25,d:'Te sobra margen: toca hacerlo rendir.',f:['Te sugerimos apartar parte de lo que sobra','Planes de ahorro a medio plazo primero','Aviso de “vas justo” solo si te pasas un 25 % del ritmo ideal','Retos para ahorrar más, no para sobrevivir']},
+  normal:{l:'Normal',lvl:1,tol:1.1,d:'Presupuesto normal con tu ahorro incluido.',f:['Límite diario con tu ahorro mensual ya apartado','Aviso de “vas justo” si te pasas un 10 % del ritmo ideal','Ayudas ordenadas por lo bien que encajan contigo','Retos de ahorro con tus amigos']},
+  cuidado:{l:'Cuidado',lvl:2,tol:1.05,d:'Vas justo de margen: toca vigilar los caprichos.',f:['Aviso de “vas justo” si te pasas un 5 % del ritmo ideal','Límite diario recalculado cada día','Colchón y fondo de emergencia como planes recomendados','Aviso al llegar al 80 % del presupuesto']},
+  austeridad:{l:'Austeridad',lvl:3,tol:1,d:'Recortamos lo que no es esencial.',f:['Aviso cada vez que apuntas un gasto no esencial','Los gastos no esenciales aparecen como congelados','El asistente te desaconseja las compras no esenciales','Aviso de “vas justo” en cuanto superas el ritmo ideal']},
+  rojo:{l:'Rojo',lvl:4,tol:1,d:'Estás al límite: el presupuesto casi no da para más.',f:['Todo lo de Austeridad','Ayudas urgentes y gratuitas primero','Plan de colchón recomendado','Aviso si superas tu límite de hoy']},
+  supervivencia:{l:'Supervivencia',lvl:5,tol:1,d:'Solo lo esencial hasta que acabe el mes.',f:['Tu límite diario se recalcula cada día','Aviso si gastas en ocio, compras o comer fuera','Ayudas urgentes y gratuitas primero','Bloqueo automático de la tarjeta al agotar el presupuesto']}
+};
+var GUSTOS=[['cine','Cine'],['musica','Música'],['videojuegos','Videojuegos'],['deporte','Deporte'],['viajes','Viajes'],['fiesta','Salir de fiesta'],['cocinar','Cocinar'],['moda','Moda'],['lectura','Lectura'],['tecnologia','Tecnología']];
+var ESTUDIOS=['Bachillerato','FP','Grado','Máster','Doctorado'];
+var EST_UNI=['FP','Grado','Máster','Doctorado'];
+var RENTAS=['Menos de 14.000 €','Entre 14.000 y 25.000 €','Entre 25.000 y 40.000 €','Más de 40.000 €'];
+var CATL={estudios:'Estudios',vivienda:'Vivienda',transporte:'Transporte',comida:'Comida',cultura:'Cultura y ocio',empleo:'Empleo'};
+var AYUDAS=[
+ {id:'mec',t:'Beca general del Ministerio',cat:'estudios',imp:'1.700 € por renta + 300 € básica (curso 2026-27)',val:2000,d:'Cuantías fijas y variable según tu renta y tus notas. Si vives fuera de casa por estudios, hasta 2.700 € más.',req:{estudios:['Bachillerato','FP','Grado','Máster'],renta:3},plazo:'La convocatoria 2026-27 cerró el 18 de mayo de 2026. La siguiente suele abrirse en primavera.',cal:'2027-04-01',calL:'Revisa si se abre la beca MEC',pasos:['Pide el certificado de renta de tu familia','Ten a mano tu matrícula y tu expediente','Solicítala en la sede electrónica del Ministerio']},
+ {id:'bono',t:'Bono Alquiler Joven',cat:'vivienda',imp:'250 € al mes durante un máximo de 2 años',val:3000,d:'Ayuda al alquiler para jóvenes de 18 a 35 años con ingresos por debajo de 3 veces el IPREM (unos 25.200 € brutos al año).',req:{edad:[18,35],ingresoMax:2100,vivienda:['piso']},plazo:'Depende de tu comunidad autónoma: comprueba si tiene la convocatoria abierta.',pasos:['Ten tu contrato de alquiler a nombre del solicitante','Reúne tu declaración de la renta o certificado de ingresos','Solicítala en la sede de vivienda de tu comunidad']},
+ {id:'abono',t:'Abono Joven de transporte (Madrid)',cat:'transporte',imp:'Tarifa joven reducida (unos 20 € al mes)',val:400,d:'Abono mensual con tarifa joven en toda la Comunidad de Madrid.',req:{edad:[0,25],cp:['28'],zona:'Comunidad de Madrid'},plazo:'Confirma el precio vigente en el Consorcio de Transportes.',pasos:['Haz la tarjeta de transporte público si no la tienes','Pide el abono joven en el Consorcio o en un estanco','Recárgalo cada mes']},
+ {id:'carne',t:'Carné Joven',cat:'cultura',imp:'Descuentos en cultura, ocio y viajes',val:0,d:'Tarjeta con descuentos en cines, museos, tiendas y transporte. Las ventajas dependen de tu comunidad.',req:{edad:[14,30],gusto:['cine','musica','viajes','lectura','deporte']},plazo:'Se tramita todo el año.',pasos:['Busca el carné de tu comunidad autónoma','Hazlo online con tu DNI','Revisa su catálogo de descuentos antes de pagar']},
+ {id:'irpf',t:'Deducción por alquiler (IRPF Madrid)',cat:'vivienda',imp:'Hasta 1.000 € menos en tu declaración (orientativo)',val:1000,d:'Menores de 35 años que alquilan su vivienda habitual en la Comunidad de Madrid pueden deducir una parte del alquiler. Confirma los límites en la Agencia Tributaria.',req:{edad:[0,34],cp:['28'],zona:'Comunidad de Madrid',vivienda:['piso']},plazo:'Se aplica en la campaña de la renta, cada primavera.',pasos:['Guarda los recibos o transferencias del alquiler','Anota la fianza depositada en tu comunidad','Marca la deducción al hacer la declaración']},
+ {id:'garantia',t:'Garantía Juvenil',cat:'empleo',imp:'Formación, prácticas y ofertas de empleo',val:0,d:'Programa para jóvenes de 16 a 29 años que da acceso a formación y ofertas de trabajo.',req:{edad:[16,29]},plazo:'Inscripción abierta todo el año.',pasos:['Inscríbete en el sistema nacional de Garantía Juvenil','Pide cita en tu servicio de empleo','Revisa las ofertas que te asignen']},
+ {id:'colab',t:'Beca de colaboración',cat:'estudios',imp:'Ayuda por colaborar en un departamento',val:0,d:'Colaboras unos meses en un departamento de tu universidad y recibes una ayuda. Se convoca cada curso.',req:{estudios:['Grado','Máster']},plazo:'Consulta el calendario de tu universidad.',pasos:['Habla con un profesor de tu área','Mira la convocatoria de tu universidad','Presenta tu solicitud con el expediente']},
+ {id:'erasmus',t:'Erasmus+ (movilidad)',cat:'estudios',imp:'Ayuda mensual según el país de destino',val:0,d:'Estudia o haz prácticas en otro país europeo con una ayuda para cubrir parte del coste de vida.',req:{estudios:EST_UNI,gusto:['viajes']},plazo:'Cada universidad abre su convocatoria, normalmente el curso anterior.',pasos:['Habla con la oficina de relaciones internacionales','Elige destinos y presenta tu solicitud','Pide también las becas complementarias']},
+ {id:'menu',t:'Menú universitario',cat:'comida',imp:'Comida completa a precio reducido',val:0,urg:true,d:'La mayoría de campus tienen cafetería o comedor con menú económico para estudiantes.',req:{estudios:EST_UNI},plazo:'Sin plazo.',pasos:['Mira el menú de la semana de tu facultad','Lleva tu carné universitario','Combínalo con táper los días que no comas en el campus']},
+ {id:'emerg',t:'Ayuda de emergencia de tu universidad',cat:'estudios',imp:'Pago puntual para imprevistos',val:0,urg:true,d:'Muchas universidades tienen un fondo social para estudiantes con problemas económicos sobrevenidos. Pregunta en el servicio de becas o de atención al estudiante.',req:{estudios:['Grado','Máster','Doctorado']},plazo:'Pregunta por el plazo en tu universidad.',pasos:['Escribe al servicio de atención al estudiante','Explica tu situación y pide los requisitos','Entrega la documentación que te pidan']},
+ {id:'alimentos',t:'Banco de alimentos y comedores sociales',cat:'comida',imp:'Comida gratis cuando llegas justo',val:0,urg:true,gratis:true,d:'Entidades como Cruz Roja o los bancos de alimentos de tu zona reparten comida a quien lo necesita.',req:null,plazo:'Sin plazo. Pide cita en tu servicio social o en la entidad.',pasos:['Busca la entidad más cercana a tu barrio','Pide cita o infórmate del horario','Lleva tu DNI o tarjeta de estudiante']},
+ {id:'digital',t:'Planes de estudiante',cat:'cultura',imp:'Descuento en música, software y almacenamiento',val:0,d:'Muchas plataformas ofrecen precio reducido con tu correo universitario o con un justificante de matrícula.',req:{estudios:EST_UNI,gusto:['musica','videojuegos','tecnologia','cine']},plazo:'Sin plazo.',pasos:['Revisa tus suscripciones actuales','Busca el plan de estudiante de cada servicio','Verifica tu matrícula y cambia de plan']},
+ {id:'deporte',t:'Deporte universitario',cat:'cultura',imp:'Instalaciones y actividades a precio de estudiante',val:0,d:'Las universidades tienen servicio de deportes con cuotas más bajas que un gimnasio privado.',req:{estudios:['Grado','Máster','Doctorado'],gusto:['deporte']},plazo:'Consulta el plazo en el servicio de deportes de tu universidad.',pasos:['Mira las actividades de tu campus','Compara la cuota con tu gimnasio actual','Apúntate al inicio del cuatrimestre']},
+ {id:'biblio',t:'Biblioteca y préstamo gratuito',cat:'cultura',imp:'Libros, películas y salas de estudio sin coste',val:0,gratis:true,d:'Las bibliotecas públicas y la de tu universidad prestan libros, películas y juegos, y tienen salas para estudiar.',req:null,gusto:['lectura','cine'],plazo:'Sin plazo. Solo necesitas el carné.',pasos:['Haz el carné de tu biblioteca','Reserva online lo que quieras','Aprovecha las salas de estudio con wifi']}
+];
+var RETOS=[
+ {id:'delivery',t:'Semana sin delivery',dias:7,pts:15,est:8,c:'Comida',d:'Cocina en casa siete días seguidos. Cada día cuenta lo que habrías gastado en pedir.'},
+ {id:'taper',t:'Táper de lunes a viernes',dias:5,pts:12,est:6,c:'Comida',d:'Llévate comida de casa a clase o al trabajo cinco días laborables.'},
+ {id:'impulso',t:'Regla de las 48 horas',dias:10,pts:10,est:5,c:'Compras',d:'Antes de comprar algo que no es esencial, espera 48 horas. Si sigues queriéndolo, cómpralo.'},
+ {id:'cafe',t:'Café en casa',dias:14,pts:6,est:2,c:'Gastos hormiga',d:'Dos semanas con el café de casa en termo.'},
+ {id:'gratis',t:'Ocio gratis',dias:7,pts:12,est:10,c:'Ocio',d:'Una semana de planes que no cuestan nada: parque, biblioteca, quedadas en casa.'},
+ {id:'hormiga',t:'Cero gastos hormiga',dias:30,pts:8,est:3,c:'Gastos hormiga',d:'Un mes sin pequeñas compras que se te olvidan al día siguiente.'}
+];
+var AMIGOS=['Lucía','Marcos','Aitana','Dani'];
+var LV=[[0,'Novato'],[60,'Ahorrador'],[200,'Estratega'],[500,'Maestro del táper']];
+var PLANES=[
+ {id:'mini',t:'Colchón anti fin de mes',d:'Un pequeño fondo para no llegar a final de mes con 20 €.',def:function(){return 150;},steps:['Aparta una cantidad fija el día que cobras','Guárdala en una cuenta aparte, sin tarjeta','Úsala solo si faltan días y no queda presupuesto']},
+ {id:'fondo',t:'Fondo de emergencia',d:'Tres meses de gastos fijos guardados para imprevistos.',def:function(){var f=sumObj(S.profile.gastos);return f>0?Math.round(3*f/10)*10:900;},steps:['Calcula tus gastos fijos de un mes','Automatiza una transferencia mensual','Revisa el fondo cada trimestre']},
+ {id:'piso',t:'Primer piso',d:'Fianza, primer mes y mudanza para independizarte.',def:function(){var s=simInit();return Math.round((2*(s.rent/Math.max(1,s.n))+400)/10)*10;},steps:['Prueba tu caso en el simulador de emancipación','Reserva ahorro para fianza y primer mes','Mira si cumples los requisitos del Bono Alquiler Joven']},
+ {id:'erasmus',t:'Erasmus o intercambio',d:'La diferencia entre la ayuda y el coste de vivir fuera.',def:function(){return 1500;},steps:['Pregunta cuánto cuesta vivir en tu destino','Resta la ayuda que te darían','Ahorra la diferencia con un plan mensual']},
+ {id:'viaje',t:'Viaje de fin de carrera',d:'Un viaje con amigos sin tirar de tarjeta.',def:function(){return 900;},steps:['Fija destino y fechas con el grupo','Reparte el coste entre todos','Ahorra una cuota mensual compartida']},
+ {id:'portatil',t:'Portátil nuevo',d:'Cambiar de equipo sin pagar a plazos.',def:function(){return 700;},steps:['Mira primero los planes de estudiante','Compara equipos reacondicionados','Compra cuando llegues al objetivo']}
+];
+var PLAN_REC={holgado:['piso','viaje','erasmus'],normal:['fondo','piso'],cuidado:['mini','fondo'],austeridad:['mini','fondo'],rojo:['mini'],supervivencia:['mini']};
+var IDEAS_GRATIS={cine:'Cine fórum o proyecciones gratuitas de tu facultad',musica:'Conciertos gratis en salas pequeñas y fiestas de barrio',videojuegos:'Juegos gratuitos y partidas en casa con amigos',deporte:'Correr, calistenia o bici por parques',viajes:'Rutas a pie por barrios que no conoces',fiesta:'Quedada en casa con cada uno aportando algo',cocinar:'Cena de táper con amigos',moda:'Intercambio de ropa entre amigos',lectura:'Préstamo de libros en la biblioteca',tecnologia:'Talleres gratuitos y charlas de tu facultad'};
+var SUG=['¿Cuánto puedo gastar hoy?','¿Puedo gastarme 35 € en unas zapatillas?','¿Qué ayudas me corresponden?','Recuérdame pagar el alquiler','Bloquea mi tarjeta','Dame un consejo para ahorrar','¿Quién me debe dinero?'];
+
+/* ---------- estado ---------- */
+var KEY='finmes.v1';
+var mem=null;
+function defaults(){return {profile:null,mode:'normal',groups:[],gastos:[],saved:[],discarded:[],hist:[],joined:{},events:[],plans:{},card:{blocked:false,auto:true,alertDaily:true,alert80:true},chat:[],sim:null,lastDigest:'',example:false,flags:{}};}
+function load(){try{var r=localStorage.getItem(KEY);if(r)return JSON.parse(r);}catch(e){}return mem;}
+var S=Object.assign(defaults(),load()||{});
+S.card=Object.assign(defaults().card,S.card||{});
+if(!MODES[S.mode])S.mode='normal';
+if(!S.groups)S.groups=[];
+S.chat=(S.chat||[]).filter(function(m){return !m.pending;});
+function lvl(){return MODES[S.mode].lvl;}
+function save(){mem=S;try{localStorage.setItem(KEY,JSON.stringify(S));}catch(e){}}
+var D=null;               // borrador del registro
+var ayFilter='todas';
+var now0=new Date();
+var calCur={y:now0.getFullYear(),m:now0.getMonth()};
+var calSel=ymd(now0);
+var resetArmed=false;
+
+/* ---------- modelo de presupuesto ---------- */
+function model(){
+  var p=S.profile,now=new Date(),y=now.getFullYear(),mo=now.getMonth(),day=now.getDate(),n=dim(y,mo);
+  var ingresos=sumObj(p.ingresos),fijos=sumObj(p.gastos),ahorro=+p.ahorro||0;
+  var budget=Math.max(0,ingresos-fijos-ahorro);
+  var prefix=y+'-'+pad(mo+1);
+  var mg=S.gastos.filter(function(g){return g.fecha.indexOf(prefix)===0;});
+  var spent=mg.reduce(function(a,g){return a+g.importe;},0);
+  var today=ymd(now);
+  var spentToday=mg.filter(function(g){return g.fecha===today;}).reduce(function(a,g){return a+g.importe;},0);
+  var remaining=budget-spent,daysLeft=n-day+1;
+  var allowance=(budget-(spent-spentToday))/daysLeft;
+  var leftToday=allowance-spentToday;
+  var ideal=budget*day/n;
+  var st='ok';
+  if(budget<=0||remaining<=0)st='bad';else if(spent>ideal*MODES[S.mode].tol)st='warn';
+  return {ingresos:ingresos,fijos:fijos,ahorro:ahorro,budget:budget,spent:spent,spentToday:spentToday,remaining:remaining,daysLeft:daysLeft,allowance:allowance,leftToday:leftToday,ideal:ideal,day:day,n:n,y:y,mo:mo,mg:mg,st:st,libre:ingresos-fijos};
+}
+
+/* ---------- ayudas: encaje con el perfil ---------- */
+function matchOne(a){
+  var p=S.profile,r=a.req||{},ch=[];
+  var add=function(ok,y,n){ch.push({ok:ok,l:ok?y:n});};
+  if(r.edad){var ok=p.edad>=r.edad[0]&&p.edad<=r.edad[1];add(ok,'Tienes '+p.edad+' años','Pensada para '+(r.edad[0]?r.edad[0]+' a ':'hasta ')+r.edad[1]+' años');}
+  if(r.estudios){var ok2=r.estudios.indexOf(p.estudios)>=0;add(ok2,'Estudias '+p.estudios,'Pensada para '+r.estudios.join(', '));}
+  if(r.cp){var ok3=r.cp.some(function(c){return p.cp.indexOf(c)===0;});add(ok3,'Vives en tu zona (CP '+p.cp+')','Solo en '+r.zona);}
+  if(r.renta){var ok4=p.renta<=r.renta;add(ok4,'La renta de tu familia encaja','Renta familiar por encima del umbral');}
+  if(r.ingresoMax){var ok5=sumObj(p.ingresos)<=r.ingresoMax;add(ok5,'Tus ingresos están dentro del límite','Tus ingresos superan el límite');}
+  if(r.vivienda){var ok6=r.vivienda.indexOf(p.vivienda)>=0;add(ok6,'Vives de alquiler','Necesitas un contrato de alquiler (pruébalo en el simulador)');}
+  var g=r.gusto||a.gusto;
+  if(g&&(p.gustos||[]).some(function(x){return g.indexOf(x)>=0;}))ch.push({ok:true,l:'Encaja con tus gustos'});
+  var tot=ch.length,oks=ch.filter(function(c){return c.ok;}).length;
+  var score=tot?Math.round(100*oks/tot):60;
+  if(!tot)ch.push({ok:true,l:'Disponible para cualquier estudiante'});
+  return {a:a,score:score,checks:ch};
+}
+function matchAll(){
+  var m=AYUDAS.map(matchOne);
+  var key=function(x){var k=x.score;if(lvl()>=4&&(x.a.urg||x.a.gratis))k+=100;if(S.mode==='holgado'&&(x.a.cat==='cultura'||x.a.cat==='estudios'))k+=5;return k+Math.min(x.a.val,3000)/10000;};
+  return m.sort(function(a,b){return key(b)-key(a);});
+}
+
+/* ---------- calendario ---------- */
+function eventsOn(dt){
+  var p=S.profile,y=dt.getFullYear(),mo=dt.getMonth(),d=dt.getDate(),n=dim(y,mo),out=[],key=ymd(dt);
+  var on=function(day){return Math.min(day,n)===d;};
+  var R=[['Cobro del mes','ingreso',p.diaCobro||1,sumObj(p.ingresos)],['Alquiler o residencia','gasto',1,p.gastos.vivienda],['Abono de transporte','gasto',1,p.gastos.transporte],['Móvil e internet','gasto',5,p.gastos.movil],['Suscripciones','gasto',12,p.gastos.suscripciones],['Otros gastos fijos','gasto',15,p.gastos.otros]];
+  R.forEach(function(r){if(+r[3]>0&&on(r[2]))out.push({id:'rec-'+r[0],title:r[0],kind:r[1],amt:+r[3],date:key,rec:true,day:r[2]});});
+  S.events.forEach(function(e){if(e.date===key)out.push(e);});
+  S.saved.forEach(function(id){var a=AYUDAS.filter(function(x){return x.id===id;})[0];if(a&&a.cal===key)out.push({id:'ay-'+id,title:a.t+': '+a.calL,kind:'ayuda',date:key,note:'Fecha estimada. Confírmala en la convocatoria.'});});
+  Object.keys(S.joined).forEach(function(id){var r=RETOS.filter(function(x){return x.id===id;})[0];if(!r)return;var end=ymd(addDays(parse(S.joined[id].start),r.dias-1));if(end===key)out.push({id:'rt-'+id,title:'Último día del reto: '+r.t,kind:'reto',date:key});});
+  return out;
+}
+function gcalUrl(e){
+  var d=e.date.replace(/-/g,''),nx=ymd(addDays(parse(e.date),1)).replace(/-/g,'');
+  var q=new URLSearchParams({action:'TEMPLATE',text:e.title+(e.amt?' ('+eur(e.amt)+')':''),dates:d+'/'+nx,details:e.note||'Creado con Fin de Mes'});
+  if(e.rec)q.set('recur','RRULE:FREQ=MONTHLY');
+  if(e.guests)q.set('add',e.guests);
+  return 'https://calendar.google.com/calendar/render?'+q.toString();
+}
+function icsFor(list){
+  var st=new Date().toISOString().replace(/[-:]/g,'').replace(/\.\d{3}/,'');
+  var L=['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//Fin de Mes//ES','CALSCALE:GREGORIAN'];
+  list.forEach(function(e){
+    var d=e.date.replace(/-/g,''),nx=ymd(addDays(parse(e.date),1)).replace(/-/g,'');
+    L.push('BEGIN:VEVENT','UID:'+(e.id||uid())+'-'+d+'@finmes','DTSTAMP:'+st,'DTSTART;VALUE=DATE:'+d,'DTEND;VALUE=DATE:'+nx,'SUMMARY:'+(e.title+(e.amt?' ('+eur(e.amt)+')':'')).replace(/[,;]/g,' '),'END:VEVENT');
+  });
+  L.push('END:VCALENDAR');return L.join('\n');
+}
+function upcoming(days,max){
+  var out=[],t=new Date();
+  for(var i=0;i<days&&out.length<max;i++){var d=addDays(t,i);eventsOn(d).forEach(function(e){if(out.length<max)out.push({d:d,e:e});});}
+  return out;
+}
+
+/* ---------- retos ---------- */
+function retoStats(id){
+  var j=S.joined[id];if(!j)return null;
+  var r=RETOS.filter(function(x){return x.id===id;})[0],set={};j.checks.forEach(function(c){set[c]=1;});
+  var days=Object.keys(set).length,streak=0,d=new Date();
+  if(!set[ymd(d)])d=addDays(d,-1);
+  while(set[ymd(d)]){streak++;d=addDays(d,-1);}
+  return {days:days,streak:streak,done:days>=r.dias,pct:Math.min(100,Math.round(days/r.dias*100)),saved:days*r.est,today:!!set[ymd(new Date())]};
+}
+function points(){var p=0;Object.keys(S.joined).forEach(function(id){var s=retoStats(id),r=RETOS.filter(function(x){return x.id===id;})[0];if(s&&r)p+=s.days*r.pts+(s.done?50:0);});return p;}
+function level(pt){var i=0;LV.forEach(function(l,k){if(pt>=l[0])i=k;});return {i:i,name:LV[i][1],next:LV[i+1]||null,from:LV[i][0]};}
+function friendDays(name,r){var j=S.joined[r.id];var el=j?Math.max(1,Math.round((new Date()-parse(j.start))/864e5)+1):3;return Math.min(r.dias,Math.round(el*(0.55+(hash(name+r.id)%45)/100)));}
+
+/* ---------- simulador de emancipación ---------- */
+function simInit(){
+  if(!S.sim){S.sim={ingresos:Math.round(sumObj(S.profile.ingresos)),rent:1200,n:4,vida:350,tipo:'habitacion',tope:300,bono:true};save();}
+  return S.sim;
+}
+function simCalc(s,n){
+  var edad=S.profile.edad,share=s.rent/n;
+  var ageOk=edad>=18&&edad<=35,incOk=s.ingresos<=2100,rentOk=s.tipo==='habitacion'?share<=s.tope:s.rent<=s.tope;
+  var elig=ageOk&&incOk&&rentOk,bono=(s.bono&&elig)?Math.min(250,share):0,net=share-bono;
+  var ratio=s.ingresos>0?net/s.ingresos:Infinity;
+  return {n:n,share:share,ageOk:ageOk,incOk:incOk,rentOk:rentOk,elig:elig,bono:bono,net:net,ratio:ratio,ok:ratio<=0.30};
+}
+
+/* ---------- avisos y asistente ---------- */
+function toast(msg,kind){
+  var el=document.createElement('div');el.className='toast'+(kind?' '+kind:'');el.textContent=msg;$('#toasts').appendChild(el);
+  setTimeout(function(){el.remove();},4800);
+}
+function say(t,alert,acts){S.chat.push({r:'a',t:t,alert:!!alert,acts:acts||[]});if(S.chat.length>60)S.chat.shift();save();}
+function ensureChat(){
+  var m=model();
+  if(!S.chat.length)say('Hola, '+S.profile.nombre+'. Hoy puedes gastar **'+eur(m.leftToday,2)+'**. Pregúntame si puedes permitirte algo, qué ayudas te corresponden o pídeme un recordatorio.');
+}
+function digest(){
+  var t=ymd(new Date());if(!S.profile||S.lastDigest===t)return;
+  var m=model();S.lastDigest=t;
+  say('Buenos días. Hoy puedes gastar **'+eur(m.leftToday,2)+'** y te quedan **'+eur(m.remaining,2)+'** para '+m.daysLeft+' días.',true);
+  save();
+}
+function copy(text,okMsg){
+  var fallback=function(){var ta=document.createElement('textarea');ta.value=text;ta.style.cssText='position:fixed;opacity:0';document.body.appendChild(ta);ta.select();var ok=false;try{ok=document.execCommand('copy');}catch(_){}ta.remove();toast(ok?(okMsg||'Copiado'):'No se pudo copiar. Selecciona el texto a mano.',ok?'ok':'bad');};
+  try{navigator.clipboard.writeText(text).then(function(){toast(okMsg||'Copiado','ok');},fallback);}catch(e){fallback();}
+}
+function addGasto(amt,cat,con,pago){
+  var before=model();
+  if(S.card.blocked&&pago==='tarjeta'){toast('Pago rechazado: tu tarjeta está bloqueada. Puedes registrarlo como efectivo.','bad');say('He rechazado un pago de **'+eur(amt,2)+'** porque tu tarjeta está bloqueada.',true);render();return;}
+  S.gastos.push({id:uid(),fecha:ymd(new Date()),cat:cat,importe:amt,concepto:con||CATS[cat].l,pago:pago});save();
+  var m=model(),c=CATS[cat];
+  if(lvl()>=3&&!c.e){toast('Modo '+MODES[S.mode].l+': este gasto no es esencial','bad');say('Has apuntado **'+eur(amt,2)+'** en "'+c.l+'". Estás en Modo '+MODES[S.mode].l+': intenta posponerlo.',true);}
+  if(S.card.alertDaily&&m.leftToday<0&&before.leftToday>=0){toast('Has pasado tu límite de hoy','bad');say('Has superado tu límite de hoy en **'+eur(-m.leftToday,2)+'**. Mañana tu límite baja a **'+eur(Math.max(0,m.remaining)/Math.max(1,m.daysLeft-1),2)+'**.',true);}
+  var pb=before.budget?before.spent/before.budget:0,pa=m.budget?m.spent/m.budget:0;
+  if(S.card.alert80&&pa>=.8&&pb<.8&&m.remaining>0){toast('Has gastado el 80 % de tu presupuesto','bad');say('Llevas el **80 %** del presupuesto del mes. Te quedan **'+eur(m.remaining,2)+'** para '+m.daysLeft+' días.',true);}
+  if(S.card.auto&&m.remaining<=0&&!S.card.blocked){S.card.blocked=true;save();toast('Presupuesto agotado: tarjeta bloqueada (simulación)','bad');say('Has agotado el presupuesto del mes y he **bloqueado tu tarjeta** (simulación). Puedes desbloquearla cuando quieras.',true);}
+  render();
+}
+function bot(q){
+  var t=norm(q),m=model(),mm=t.match(/(\d+(?:[.,]\d{1,2})?)/),A=mm?parseFloat(mm[1].replace(',','.')):null;
+  var has=function(){for(var i=0;i<arguments.length;i++){if(t.indexOf(arguments[i])>=0)return true;}return false;};
+  if(has('desbloque')){S.card.blocked=false;save();return {t:'Hecho: he **desbloqueado** tu tarjeta (simulación).'};}
+  if(has('bloque')){S.card.blocked=true;save();return {t:'Hecho: he **bloqueado** tu tarjeta (simulación). Podrás seguir apuntando gastos en efectivo.'};}
+  if(A!==null&&has('puedo','comprar','gastar','gastarme','me compro','vale la pena')){
+    var non=has('cine','copas','fiesta','ropa','zapatillas','cerveza','concierto','videojuego','restaurante','capricho','salir','cena');
+    if(lvl()>=3&&non)return {t:'Ahora mismo **no te lo recomiendo**: estás en Modo '+MODES[S.mode].l+' y eso no es esencial. Si lo quieres de verdad, espera a cobrar.'};
+    if(A<=m.leftToday)return {t:'**Sí**, entra en tu límite de hoy. Te quedarían **'+eur(m.leftToday-A,2)+'** para hoy.'};
+    if(A<=m.remaining){var np=(m.remaining-A)/Math.max(1,m.daysLeft-1);return {t:'Entra en el mes, pero **te pasas '+eur(A-m.leftToday,2)+'** de tu límite de hoy. Si lo compras, tu límite diario baja a **'+eur(np,2)+'** el resto del mes.'};}
+    return {t:'**No**: supera lo que te queda del mes ('+eur(m.remaining,2)+'). Si es necesario, mira las ayudas de urgencia.',acts:[{l:'Ver ayudas',h:'#ayudas'}]};
+  }
+  if(has('recuerda','recordatorio','avisame','recuerdame')){
+    var ttl=q.replace(/(recu[eé]rdame|recordatorio|av[ií]same)\s*(de|que|para)?/i,'').trim()||'Revisar mis gastos';
+    var ev={id:uid(),title:ttl.charAt(0).toUpperCase()+ttl.slice(1),kind:'aviso',date:ymd(addDays(new Date(),1)),amt:0,note:'Recordatorio creado desde el asistente'};
+    S.events.push(ev);save();
+    return {t:'Listo. Te lo he puesto en el calendario para mañana: **'+ev.title+'**.',acts:[{l:'Añadir a Google Calendar',h:gcalUrl(ev),ext:1},{l:'Ver calendario',h:'#calendario'}]};
+  }
+  if(has('supervivencia','sin dinero','emergencia')||/ sos /.test(t)){setTimeout(openSOS,60);return {t:'Abro el Modo Supervivencia con lo esencial para lo que queda de mes.'};}
+  if(has('me debe','te debo','debo a','grupo','tricount','deudas'))return groupBot();
+  if(has('ayuda','beca','subvenc','cupon','oferta','descuento','bono')){
+    var top=matchAll().slice(0,3);
+    return {t:'Estas son las que mejor encajan contigo ahora:\n'+top.map(function(x){return '• **'+x.a.t+'** ('+x.score+' %)';}).join('\n'),acts:[{l:'Abrir ayudas',h:'#ayudas'}]};
+  }
+  if(has('alquiler','indepen','piso','emancip')){
+    var s=simInit(),c=simCalc(s,s.n);
+    return {t:'Con tus datos del simulador ('+s.n+' personas, '+eur(s.rent)+' en total) pagarías **'+eur(c.net)+'** al mes, el **'+Math.round(c.ratio*100)+' %** de tus ingresos. '+(c.ok?'Te sale por debajo del 30 %.':'Te pasas del 30 %.'),acts:[{l:'Abrir simulador',h:'#emancipacion'}]};
+  }
+  if(has('reto')){return {t:'Te propongo empezar por la **semana sin delivery**: es corta y se nota en el bolsillo.',acts:[{l:'Ver retos',h:'#retos'}]};}
+  if(has('plan')){return {t:'Según tu modo ('+MODES[S.mode].l+'), te recomiendo: '+PLAN_REC[S.mode].map(function(id){return PLANES.filter(function(p){return p.id===id;})[0].t;}).join(', ')+'.',acts:[{l:'Ver planes',h:'#planes'}]};}
+  if(has('ahorr','consejo','truco')){
+    var tips={supervivencia:['Cocina por lotes el domingo y congela raciones.','Pausa todas las suscripciones hasta que cobres.','Pide en el comedor universitario en vez de comprar fuera.'],ajustado:['Transfiere tu ahorro el día que cobras, no al final de mes.','Revisa tus suscripciones: ¿usas todas?','Prueba la regla de las 48 horas antes de comprar.'],holgado:['Aparta un 20 % de lo que te sobra a un plan con meta.','Revisa si tienes descuentos de estudiante sin usar.','Mantén un fondo de tres meses antes de gastar en caprichos.']};
+    tips.normal=tips.cuidado=tips.ajustado;tips.austeridad=tips.rojo=tips.supervivencia;var arr=tips[S.mode];return {t:'Un consejo para tu modo: '+arr[Math.floor(Math.random()*arr.length)]};
+  }
+  if(has('hoy','cuanto','saldo','queda','presupuesto','limite')){
+    return {t:'Hoy puedes gastar **'+eur(m.leftToday,2)+'**. Te quedan **'+eur(m.remaining,2)+'** del presupuesto de este mes para '+m.daysLeft+' días.'};
+  }
+  if(has('hola','buenas')){return {t:'Hola, '+S.profile.nombre+'. Hoy puedes gastar **'+eur(m.leftToday,2)+'**. ¿Qué quieres saber?'};}
+  return {t:'Puedo decirte cuánto puedes gastar hoy, si te puedes permitir una compra, qué ayudas te corresponden, crear un recordatorio o bloquear la tarjeta. Prueba con una de las sugerencias.'};
+}
+
+/* ---------- vistas ---------- */
+/* ---------- grupos (estilo Tricount) ---------- */
+var gSel=null,ME='Tú';
+function cents(x){return Math.round(x*100);}
+function gBal(g){
+  var b={};g.members.forEach(function(n){b[n]=0;});
+  g.exp.forEach(function(e){var c=cents(e.amt),k=e.split.length,base=Math.floor(c/k),rem=c-base*k;b[e.payer]+=c;e.split.forEach(function(w,i){b[w]-=base+(i<rem?1:0);});});
+  g.paid.forEach(function(p){b[p.from]+=cents(p.amt);b[p.to]-=cents(p.amt);});
+  return b;
+}
+function gDebts(g){
+  var b=gBal(g),cr=[],de=[],out=[],i=0,j=0;
+  Object.keys(b).forEach(function(n){if(b[n]>0)cr.push([n,b[n]]);else if(b[n]<0)de.push([n,-b[n]]);});
+  cr.sort(function(a,c){return c[1]-a[1];});de.sort(function(a,c){return c[1]-a[1];});
+  while(i<de.length&&j<cr.length){var a=Math.min(de[i][1],cr[j][1]);out.push({from:de[i][0],to:cr[j][0],c:a});de[i][1]-=a;cr[j][1]-=a;if(de[i][1]===0)i++;if(cr[j][1]===0)j++;}
+  return out;
+}
+/* ---------- nube (Supabase) ---------- */
+import { supabase as sb } from './supabaseClient.js';
+var cloud={user:null,groups:[],err:''};
+function CL(){return !!(sb&&cloud.user);}
+function gl(){return CL()?cloud.groups:S.groups;}
+
+async function syncProfileToSupabase(){
+  if (!sb || !cloud.user || !S.profile || !S.profile.nombre) return;
+
+  var p = S.profile;
+  var { error } = await sb.from('perfiles').upsert({
+    id: cloud.user.id,
+    nombre: p.nombre,
+    edad: p.edad,
+    estudios: p.estudios,
+    centro: p.centro || '',
+    cp: p.cp || '',
+    renta: p.renta,
+    vivienda: p.vivienda,
+    modo: S.mode,
+    updated_at: new Date().toISOString()
+  });
+
+  if (error) {
+    console.error('Error guardando en perfiles:', error);
+    toast('Error guardando perfil en Supabase: ' + error.message, 'bad');
+  } else {
+    toast('¡Perfil guardado en la nube!', 'ok');
+  }
+}
+
+async function cloudLoad(){
+  var r=await sb.from('grupos').select('id,nombre,codigo,grupo_miembros(id,nombre,user_id),grupo_gastos(id,concepto,importe_cents,pagador_id,fecha,grupo_reparto(miembro_id)),grupo_pagos(de_id,a_id,importe_cents)').order('created_at');
+  if(r.error){cloud.err=r.error.message;return;}
+  cloud.err='';
+  cloud.groups=r.data.map(function(g){
+    var nm={},ids={};
+    g.grupo_miembros.forEach(function(m){nm[m.id]=(m.user_id&&m.user_id===cloud.user.id)?ME:m.nombre;ids[nm[m.id]]=m.id;});
+    return {id:g.id,name:g.nombre,code:g.codigo,ids:ids,members:g.grupo_miembros.map(function(m){return nm[m.id];}),
+      exp:g.grupo_gastos.map(function(e){return {id:e.id,what:e.concepto,amt:e.importe_cents/100,payer:nm[e.pagador_id],split:e.grupo_reparto.map(function(x){return nm[x.miembro_id];}),date:e.fecha};}),
+      paid:g.grupo_pagos.map(function(p){return {from:nm[p.de_id],to:nm[p.a_id],amt:p.importe_cents/100};})};
+  });
+}
+async function cloudDo(fn,ok){
+  try{var r=await fn();if(r&&r.error)throw r.error;await cloudLoad();render();if(ok)toast(ok,'ok');}
+  catch(e){toast('Error en la nube: '+(e.message||e),'bad');}
+}
+async function cloudAuth(mode,em,pw){
+  if(!em||pw.length<6){toast('Escribe un email y una contraseña de 6 caracteres o más','bad');return;}
+  try{
+    var r=mode==='up'?await sb.auth.signUp({email:em,password:pw}):await sb.auth.signInWithPassword({email:em,password:pw});
+    if(r.error)throw r.error;
+    if(!r.data.session){toast('Revisa tu correo para confirmar la cuenta y vuelve a entrar','ok');return;}
+    cloud.user=r.data.user;
+    await syncProfileToSupabase();
+    await cloudLoad();render();toast('Sesión iniciada','ok');
+  }catch(e){toast(e.message||'No se pudo entrar','bad');}
+}
+async function cloudInit(){
+  if(!sb)return;
+  try{
+    var r=await sb.auth.getSession();
+    cloud.user=r.data.session?r.data.session.user:null;
+    if(cloud.user){
+      await syncProfileToSupabase();
+      await cloudLoad();
+    }
+    render();
+  }catch(e){cloud.err=String(e.message||e);}
+}
+function cloudNewGroup(name,ms){
+  var seen={};ms=ms.filter(function(n){if(n===ME||seen[n])return false;seen[n]=1;return true;});
+  cloudDo(async function(){
+    var g=await sb.from('grupos').insert({nombre:name}).select('id').single();if(g.error)return g;
+    gSel=g.data.id;
+    var rows=[{grupo_id:g.data.id,user_id:cloud.user.id,nombre:S.profile.nombre}].concat(ms.map(function(n){return {grupo_id:g.data.id,nombre:n};}));
+    return sb.from('grupo_miembros').insert(rows);
+  },'Grupo creado');
+}
+function cloudAddExp(g,what,amt,payer,split){
+  cloudDo(async function(){
+    var e=await sb.from('grupo_gastos').insert({grupo_id:g.id,concepto:what,importe_cents:cents(amt),pagador_id:g.ids[payer]}).select('id').single();if(e.error)return e;
+    return sb.from('grupo_reparto').insert(split.map(function(n){return {gasto_id:e.data.id,miembro_id:g.ids[n]};}));
+  },'Gasto añadido');
+}
+/* ---------- asistente con Claude (vía Edge Function) ---------- */
+function AI_ON(){return CL();}
+function isCmd(q){return /bloque|recuerda|recordatorio|avisame|supervivencia|sin dinero|sos/.test(norm(q));}
+function aiContext(){
+  var m=model(),p=S.profile,r2=function(x){return Math.round((+x||0)*100)/100;},deu=[];
+  gl().forEach(function(g){gDebts(g).forEach(function(d){if(d.to===ME)deu.push(d.from+' te debe '+r2(d.c/100)+' € ('+g.name+')');else if(d.from===ME)deu.push('Debes '+r2(d.c/100)+' € a '+d.to+' ('+g.name+')');});});
+  return {fecha:ymd(new Date()),nombre:p.nombre,edad:p.edad,estudios:p.estudios,prefijo_cp:String(p.cp||'').slice(0,2),vivienda:p.vivienda,gustos:p.gustos||[],modo:MODES[S.mode].l,ingresos_mes:r2(m.ingresos),gastos_fijos:r2(m.fijos),ahorro_mensual:r2(m.ahorro),presupuesto_variable_mes:r2(m.budget),gastado_este_mes:r2(m.spent),queda_este_mes:r2(m.remaining),dias_restantes:m.daysLeft,limite_hoy:r2(m.leftToday),ayudas_que_encajan:matchAll().slice(0,5).map(function(x){return {titulo:x.a.t,encaje_pct:x.score,plazo:x.a.plazo};}),deudas_en_grupos:deu,planes_activos:PLANES.filter(function(pl){return S.plans[pl.id]&&S.plans[pl.id].on;}).map(function(pl){return pl.t;})};
+}
+async function aiAsk(text){
+  S.chat.push({r:'a',t:'Pensando…',pending:true,acts:[]});
+  render();
+  var out='',acts=[];
+  try{
+    var ses=await sb.auth.getSession();
+    var tok=ses && ses.data && ses.data.session ? ses.data.session.access_token : null;
+    var hist=S.chat.filter(function(x){return !x.pending;}).slice(-12).map(function(x){return {role:x.r==='u'?'user':'assistant',content:x.t};});
+    var res=await fetch('http://127.0.0.1:5000/chat', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({messages:hist,context:aiContext()})
+    });
+    var j=await res.json();
+    if(!res.ok)throw new Error(j.error||'Error del asistente');
+    out=j.reply;
+  }catch(e){
+    var f=bot(text);
+    out=f.t+'\n(No he podido contactar con la IA: '+(e.message||e)+'. Te respondo con el modo básico.)';
+    acts=f.acts||[];
+  }
+  S.chat=S.chat.filter(function(x){return !x.pending;});
+  S.chat.push({r:'a',t:out,acts:acts});if(S.chat.length>60)S.chat.shift();save();render();
+  var i=$('#chat-in');if(i&&curView()==='asistente')i.focus();
+}
+function cloudPanel(){
+  if(!sb)return '<section class="panel"><h2>Cuentas en la nube</h2><p class="hint">Ahora mismo los grupos se guardan solo en este navegador. Para compartirlos con amigos, configura Supabase (pasos en el README).</p></section>';
+  if(!cloud.user)return '<form class="panel" data-form="auth"><h2>Entra para compartir grupos</h2><label class="f"><span>Email</span><input id="au-mail" type="email" required autocomplete="email"></label><label class="f"><span>Contraseña</span><input id="au-pass" type="password" minlength="6" required autocomplete="current-password"></label><div class="row"><button class="btn primary" type="submit">Entrar</button><button class="btn" type="button" data-act="signup">Crear cuenta</button></div></form>';
+  return '<section class="panel"><h2>Cuentas en la nube<span class="pill ok">Sincronizado</span></h2><p class="hint">'+esc(cloud.user.email||'')+'</p>'+(cloud.err?'<p class="hint">'+esc(cloud.err)+'</p>':'')+'<form data-form="join" class="row"><label class="f grow"><span>Unirte con un código</span><input id="jn-code" type="text" maxlength="12" required></label><button class="btn" type="submit">Unirme</button></form><button class="btn sm ghost" data-act="signout">Cerrar sesión</button></section>';
+}
+function gExample(){
+  var all=[ME,'Lucía','Marcos','Aitana'];
+  function e(w,a,p,sp){return {id:uid(),what:w,amt:a,payer:p,split:sp||all.slice(),date:ymd(new Date())};}
+  return {id:uid(),name:'Viaje a Roma',members:all.slice(),exp:[e('Vuelos',240,ME),e('Apartamento',380,'Lucía'),e('Cena en Trastevere',64,'Marcos',[ME,'Marcos','Aitana']),e('Metro y bus',30,'Aitana')],paid:[]};
+}
+function groupBot(){
+  if(!gl().length)return {t:'Todavía no tienes grupos. Crea uno para repartir gastos con tus amigos.',acts:[{l:'Abrir grupos',h:'#grupos'}]};
+  var L=[];gl().forEach(function(g){gDebts(g).forEach(function(d){if(d.to===ME)L.push('• **'+d.from+'** te debe **'+eur(d.c/100,2)+'** ('+g.name+')');else if(d.from===ME)L.push('• Debes **'+eur(d.c/100,2)+'** a **'+d.to+'** ('+g.name+')');});});
+  return {t:L.length?'Así están tus cuentas en grupos:\n'+L.join('\n'):'Estás al día en todos tus grupos.',acts:[{l:'Abrir grupos',h:'#grupos'}]};
+}
+function vGrupos(){
+  var gs=gl();
+  if(!gs.some(function(x){return x.id===gSel;}))gSel=gs.length?gs[0].id:null;
+  var g=gs.filter(function(x){return x.id===gSel;})[0];
+  var chk=function(name,list,def){return list.map(function(n,i){return '<label class="sw"><input type="checkbox" name="'+name+'" value="'+esc(n)+'"'+(def(i)?' checked':'')+'>'+esc(n)+'</label>';}).join('');};
+  var form='<form class="panel" data-form="grupo"><h2>Nuevo grupo</h2><label class="f"><span>Nombre</span><input name="name" type="text" maxlength="40" required placeholder="Acampada en Vitoria"></label><div class="chips">'+chk('m',AMIGOS,function(i){return i<2;})+'</div><label class="f"><span>Otra persona (opcional)</span><input name="extra" type="text" maxlength="20"></label><button class="btn primary" type="submit">Crear grupo</button></form>';
+  var side='<div class="col">'+cloudPanel()+'<section class="panel"><h2>Tus grupos<span class="num">'+gs.length+'</span></h2>'+(gs.length?'<div class="chips">'+gs.map(function(x){return '<button class="chip" data-act="gSel" data-id="'+x.id+'" aria-pressed="'+(x.id===gSel)+'">'+esc(x.name)+'</button>';}).join('')+'</div>':'<p class="hint">Crea un grupo para repartir los gastos de un viaje, un piso o una comida.</p>')+(CL()?'':'<button class="btn" data-act="gExample">Cargar grupo de ejemplo</button>')+'</section>'+form+'</div>';
+  var main;
+  if(!g)main='<section class="panel"><h2>Cuentas en grupo</h2><p class="hint">Aquí verás quién ha pagado qué y quién debe a quién. Prueba con el grupo de ejemplo o crea el tuyo.</p></section>';
+  else{
+    var b=gBal(g),mine=b[ME]||0,ds=gDebts(g),tot=g.exp.reduce(function(a,e){return a+e.amt;},0);
+    var dl=ds.map(function(d){
+      var amt=eur(d.c/100,2),at='data-g="'+g.id+'" data-from="'+esc(d.from)+'" data-to="'+esc(d.to)+'" data-c="'+d.c+'"';
+      var txt=d.to===ME?'<strong>'+esc(d.from)+'</strong> te debe':d.from===ME?'Debes a <strong>'+esc(d.to)+'</strong>':'<strong>'+esc(d.from)+'</strong> debe a <strong>'+esc(d.to)+'</strong>';
+      var msg='Oye '+d.from+', me debes '+amt+' de "'+g.name+'". ¿Me lo pasas por Bizum? 😅';
+      var acts=d.to===ME?'<button class="btn sm" data-act="nudge" data-t="'+esc(msg)+'" data-who="'+esc(d.from)+'">Recordar</button><a class="btn sm ghost" target="_blank" rel="noopener" href="https://wa.me/?text='+encodeURIComponent(msg)+'">WhatsApp</a>':'';
+      return '<li><span class="l">'+txt+'<small class="num">'+amt+'</small></span><span class="row">'+acts+'<button class="btn sm ghost" data-act="settle" '+at+'>'+(d.to===ME?'Ya me pagó':d.from===ME?'Ya pagué':'Pagado')+'</button></span></li>';
+    }).join('');
+    main='<section class="panel"><h2>'+esc(g.name)+'<button class="btn sm ghost danger" data-act="gDel" data-id="'+g.id+'">Borrar grupo</button></h2><div class="chips">'+g.members.map(function(n){return '<span class="chip tag">'+esc(n)+'</span>';}).join('')+'</div>'+(g.code?'<p class="hint">Código para invitar: <strong class="num">'+esc(g.code)+'</strong></p>':'')+'<p class="hint">Gasto total: <strong class="num">'+eur(tot,2)+'</strong>. Tu saldo: <strong class="num '+(mine>=0?'pos':'neg')+'">'+(mine>=0?'+':'−')+eur(Math.abs(mine)/100,2)+'</strong></p></section>'+
+    '<section class="panel"><h2>Quién debe a quién</h2>'+(dl?'<ul class="list">'+dl+'</ul>':'<span class="pill ok">Todo saldado</span>')+'</section>'+
+    '<form class="panel" data-form="gexp" data-g="'+g.id+'"><h2>Añadir gasto</h2><div class="qa-row"><label class="f grow"><span>Concepto</span><input name="what" type="text" maxlength="40" required placeholder="Cena, gasolina, entradas..."></label><label class="f"><span>Importe (€)</span><input name="amt" type="number" inputmode="decimal" step="0.01" min="0.01" required></label><label class="f"><span>Pagó</span><select name="payer">'+g.members.map(function(n){return '<option>'+esc(n)+'</option>';}).join('')+'</select></label></div><p class="hint">Se reparte a partes iguales entre:</p><div class="chips">'+chk('w',g.members,function(){return true;})+'</div><button class="btn primary" type="submit">Añadir gasto</button></form>'+
+    '<section class="panel"><h2>Gastos<span class="num">'+g.exp.length+'</span></h2>'+(g.exp.length?'<ul class="list">'+g.exp.slice().reverse().map(function(e){return '<li><span class="l">'+esc(e.what)+'<small>Pagó '+esc(e.payer)+' · entre '+e.split.length+'</small></span><span class="row"><span class="num">'+eur(e.amt,2)+'</span><button class="btn sm ghost" data-act="gExpDel" data-g="'+g.id+'" data-id="'+e.id+'">Quitar</button></span></li>';}).join('')+'</ul>':'<p class="hint">Aún no hay gastos.</p>')+'</section>';
+  }
+  return '<div><h1>Grupos</h1><p class="sub">Reparte gastos con tus amigos y recuérdales lo que te deben.</p></div><div class="cols"><div class="col">'+main+'</div>'+side+'</div>';
+}
+
+var TABS=[['inicio','Inicio'],['ayudas','Ayudas'],['calendario','Calendario'],['retos','Retos'],['grupos','Grupos'],['emancipacion','Emancipación'],['planes','Planes'],['asistente','Asistente']];
+function curView(){var h=location.hash.slice(1);return VIEWS[h]?h:'inicio';}
+function fmt(t){return esc(t).replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').replace(/\n/g,'<br>');}
+function statusPill(m){return m.st==='ok'?'<span class="pill ok">En ritmo</span>':m.st==='warn'?'<span class="pill warn">Vas justo</span>':'<span class="pill bad">'+(m.budget<=0?'Sin margen':'Presupuesto agotado')+'</span>';}
+
+function ticketHtml(m){
+  var d=new Date();
+  var diff=m.ideal-m.spent;
+  var line=m.budget<=0?'Tus gastos fijos y tu ahorro ya se llevan todos tus ingresos.':diff>=0?'Vas '+eur(diff,2)+' por debajo del ritmo ideal.':'Llevas '+eur(-diff,2)+' por encima del ritmo ideal.';
+  return '<section class="ticket" aria-label="Resumen de hoy">'+
+  '<div class="tk-head"><span>Ticket de hoy</span><span>'+esc(d.toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'long'}))+'</span></div>'+
+  '<dl class="tk-lines"><div><dt>Presupuesto del mes</dt><dd>'+eur(m.budget)+'</dd></div><div><dt>Gastado hasta hoy</dt><dd>− '+eur(m.spent,2)+'</dd></div><div><dt>Te quedan</dt><dd>'+eur(m.remaining,2)+'</dd></div><div><dt>Días por delante, hoy incluido</dt><dd>÷ '+m.daysLeft+'</dd></div></dl>'+
+  '<div class="tk-total"><span>Hoy puedes gastar</span><strong class="hl num">'+eur(m.leftToday,2)+'</strong></div>'+
+  '<div class="tk-foot">'+statusPill(m)+'<span>'+esc(line)+'</span></div></section>';
+}
+function quickAdd(m){
+  var rec=S.gastos.slice(-4).reverse();
+  return '<form class="panel" data-form="gasto"><h2>Apunta un gasto</h2><div class="qa-row">'+
+  '<label class="f"><span>Importe (€)</span><input id="qa-amt" name="amt" type="number" inputmode="decimal" step="0.01" min="0.01" required placeholder="0,00"></label>'+
+  '<label class="f"><span>Categoría</span><select id="qa-cat" name="cat">'+Object.keys(CATS).map(function(k){return '<option value="'+k+'">'+CATS[k].l+'</option>';}).join('')+'</select></label>'+
+  '<label class="f grow"><span>Concepto</span><input id="qa-con" name="con" type="text" maxlength="40" placeholder="Café, apuntes, metro..."></label>'+
+  '<label class="f"><span>Pago</span><select id="qa-pay" name="pay"><option value="tarjeta">Tarjeta</option><option value="efectivo">Efectivo</option></select></label>'+
+  '<button class="btn primary" type="submit">Añadir</button></div>'+
+  (rec.length?'<ul class="list">'+rec.map(function(g){return '<li><span class="l">'+esc(g.concepto)+'<small>'+esc(CATS[g.cat].l)+' · '+esc(parse(g.fecha).toLocaleDateString('es-ES',{day:'numeric',month:'short'}))+'</small></span><span class="row"><span class="num">'+eur(g.importe,2)+'</span><button type="button" class="btn sm ghost" data-act="delGasto" data-id="'+g.id+'" aria-label="Deshacer gasto">Deshacer</button></span></li>';}).join('')+'</ul>':'<p class="hint">Todavía no has apuntado gastos este mes.</p>')+'</form>';
+}
+function chartSpend(m){
+  var W=640,H=250,L=48,R=14,T=16,B=30,pw=W-L-R,ph=H-T-B;
+  var daily=[];for(var i=0;i<=m.n;i++)daily.push(0);
+  m.mg.forEach(function(g){daily[+g.fecha.slice(8,10)]+=g.importe;});
+  var cum=0,pts=[[0,0]];for(var d=1;d<=m.day;d++){cum+=daily[d];pts.push([d,cum]);}
+  var maxV=Math.max(m.budget,cum,1)*1.08;
+  var X=function(d){return L+d/m.n*pw;},Y=function(v){return T+ph-(v/maxV)*ph;};
+  var ln=pts.map(function(p,i){return (i?'L':'M')+X(p[0]).toFixed(1)+' '+Y(p[1]).toFixed(1);}).join(' ');
+  var ar=ln+' L'+X(m.day).toFixed(1)+' '+Y(0).toFixed(1)+' L'+X(0).toFixed(1)+' '+Y(0).toFixed(1)+' Z';
+  var yt=[0,.5,1].map(function(f){var v=m.budget*f;return '<line x1="'+L+'" x2="'+(W-R)+'" y1="'+Y(v).toFixed(1)+'" y2="'+Y(v).toFixed(1)+'" stroke="var(--line)" stroke-width="1"/><text class="tx" x="'+(L-6)+'" y="'+(Y(v)+4).toFixed(1)+'" text-anchor="end">'+Math.round(v)+'</text>';}).join('');
+  var xs=[1,8,15,22,m.n].filter(function(v,i,a){return v<=m.n&&a.indexOf(v)===i;});
+  var xt=xs.map(function(v){return '<text class="tx" x="'+X(v).toFixed(1)+'" y="'+(H-10)+'" text-anchor="middle">'+v+'</text>';}).join('');
+  var last=pts[pts.length-1];
+  return '<section class="panel"><h2>Tu mes día a día<span class="hint num">'+MESES[m.mo]+'</span></h2>'+
+  '<svg class="ch" viewBox="0 0 '+W+' '+H+'" role="img" aria-label="Gasto acumulado de '+eur(m.spent)+' frente a un presupuesto de '+eur(m.budget)+'">'+yt+xt+
+  '<text class="tx b" x="'+(W-R)+'" y="'+(Y(m.budget)-6).toFixed(1)+'" text-anchor="end">Presupuesto '+eur(m.budget)+'</text>'+
+  '<path d="'+ar+'" fill="var(--accent-soft)" stroke="none"/>'+
+  '<line x1="'+X(0).toFixed(1)+'" y1="'+Y(0).toFixed(1)+'" x2="'+X(m.n).toFixed(1)+'" y2="'+Y(m.budget).toFixed(1)+'" stroke="var(--muted)" stroke-width="2" stroke-dasharray="5 5" fill="none"/>'+
+  '<path d="'+ln+'" fill="none" stroke="var(--accent)" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>'+
+  '<circle cx="'+X(last[0]).toFixed(1)+'" cy="'+Y(last[1]).toFixed(1)+'" r="5" fill="var(--accent)" stroke="var(--surface)" stroke-width="2"/></svg>'+
+  '<div class="legend"><span><i></i>Lo que llevas gastado</span><span><i class="d"></i>Ritmo ideal para llegar a fin de mes</span><span>Eje horizontal: día del mes</span></div></section>';
+}
+var PIEC=['#2B6CF0','#0A8F66','#E0A100','#D8381B','#7A3FD1','#E1599B','#13A3B8','#7A8499','#8C5A2B','#4C9A2A','#C2410C','#0F766E','#6D28D9'];
+function catsHtml(m){
+  var p=S.profile,FL={vivienda:'Vivienda',transporte:'Transporte (fijo)',movil:'Móvil',suscripciones:'Suscripciones',otros:'Otros fijos'},sl=[];
+  Object.keys(p.gastos||{}).forEach(function(k){var v=+p.gastos[k]||0;if(v>0)sl.push({l:FL[k]||k,v:v});});
+  var by={};m.mg.forEach(function(g){by[g.cat]=(by[g.cat]||0)+g.importe;});
+  Object.keys(CATS).forEach(function(k){if(by[k])sl.push({l:CATS[k].l,v:by[k],k:k});});
+  if(m.ahorro>0)sl.push({l:'Ahorro',v:m.ahorro});
+  var tot=sl.reduce(function(a,x){return a+x.v;},0);
+  if(!tot)return '<section class="panel"><h2>El pie de tu mes</h2><p class="hint">Cuando apuntes gastos verás aquí cómo se reparte tu dinero.</p></section>';
+  var acc=0,stops=sl.map(function(x,i){var a=acc/tot*360;acc+=x.v;return PIEC[i%PIEC.length]+' '+a.toFixed(1)+'deg '+(acc/tot*360).toFixed(1)+'deg';}).join(',');
+  return '<section class="panel"><h2>El pie de tu mes<span class="hint">'+MESES[m.mo]+'</span></h2><div class="pie-w"><div class="pie" role="img" aria-label="Gráfico circular con el reparto de tu mes" style="background:conic-gradient('+stops+')"><span class="pie-c"><strong class="num">'+eur(tot)+'</strong><small>en total</small></span></div><ul class="leg">'+sl.map(function(x,i){var frz=x.k&&lvl()>=3&&!CATS[x.k].e;return '<li><i style="background:'+PIEC[i%PIEC.length]+'"></i><span>'+esc(x.l)+(frz?' <span class="pill bad">Congelado</span>':'')+'</span><span class="num">'+Math.round(x.v/tot*100)+' %</span><span class="num">'+eur(x.v,2)+'</span></li>';}).join('')+'</ul></div><p class="hint">Gastos fijos, lo que llevas gastado este mes y tu ahorro.</p></section>';
+}
+function cardPanel(){
+  var b=S.card.blocked;
+  return '<section class="panel"><h2>Tarjeta y avisos</h2>'+
+  '<div class="vcard '+(b?'blocked':'')+'"><div class="vc-top"><span>Tarjeta de ejemplo</span><span>'+(b?'Bloqueada':'Activa')+'</span></div><span class="vc-chip" aria-hidden="true"></span><span class="vc-num">•••• 4821</span></div>'+
+  '<p class="hint">Es una simulación. En producción se conectaría con tu banco para bloquear la tarjeta de verdad.</p>'+
+  '<button class="btn '+(b?'primary':'danger')+'" data-act="toggleCard">'+(b?'Desbloquear tarjeta':'Bloquear tarjeta')+'</button>'+
+  '<label class="sw"><input type="checkbox" data-bind="card.auto"'+(S.card.auto?' checked':'')+'>Bloquear sola al agotar el presupuesto</label>'+
+  '<label class="sw"><input type="checkbox" data-bind="card.alertDaily"'+(S.card.alertDaily?' checked':'')+'>Avisarme al pasar mi límite diario</label>'+
+  '<label class="sw"><input type="checkbox" data-bind="card.alert80"'+(S.card.alert80?' checked':'')+'>Avisarme al llegar al 80 % del mes</label></section>';
+}
+function modeNotes(m){
+  var M=MODES[S.mode],extra='';
+  if(S.mode==='holgado'&&m.remaining>0)extra='<p class="hint">Sugerencia: aparta <strong>'+eur(m.remaining*0.2)+'</strong> (el 20 % de lo que te queda) a un plan.</p>';
+  if(lvl()>=3)extra='<p class="hint">Gasto no esencial este mes: <strong>'+eur(m.mg.filter(function(g){return !CATS[g.cat].e;}).reduce(function(a,g){return a+g.importe;},0),2)+'</strong>.</p>';
+  return '<section class="panel"><h2>Modo '+M.l+'</h2><p class="hint">'+M.d+'</p><ul class="chk">'+M.f.map(function(x){return '<li class="y"><b aria-hidden="true">✓</b><span>'+x+'</span></li>';}).join('')+'</ul>'+extra+'</section>';
+}
+function upcomingHtml(){
+  var u=upcoming(10,5);
+  return '<section class="panel"><h2>Lo próximo<a class="hint" href="#calendario">Calendario</a></h2>'+(u.length?'<ul class="list">'+u.map(function(x){return '<li><span class="l"><span class="kind '+x.e.kind+'"></span>'+esc(x.e.title)+'<small>'+esc(x.d.toLocaleDateString('es-ES',{weekday:'short',day:'numeric',month:'short'}))+'</small></span><span class="num">'+(x.e.amt?eur(x.e.amt):'')+'</span></li>';}).join('')+'</ul>':'<p class="hint">No hay nada en los próximos diez días.</p>')+'</section>';
+}
+function topAyudasHtml(){
+  var top=matchAll().filter(function(x){return S.saved.indexOf(x.a.id)<0&&S.discarded.indexOf(x.a.id)<0;}).slice(0,3);
+  return '<section class="panel"><h2>Ayudas para ti<a class="hint" href="#ayudas">Ver todas</a></h2>'+(top.length?'<ul class="list">'+top.map(function(x){return '<li><span class="l"><strong>'+esc(x.a.t)+'</strong><small>'+esc(x.a.imp)+'</small></span><span class="pill '+(x.score>=80?'ok':'warn')+' num">'+x.score+' %</span></li>';}).join('')+'</ul>':'<p class="hint">Has revisado todas las ayudas.</p>')+'</section>';
+}
+function vInicio(){
+  var m=model(),p=S.profile;
+  var ban=S.mode==='supervivencia'?'<div class="banner"><span><strong>Modo Supervivencia activo.</strong> Solo lo esencial hasta fin de mes.</span><button class="btn sm" data-act="sos">Ver qué hacer ahora</button></div>':'';
+  return ban+'<div><h1>Hola, '+esc(p.nombre)+'.</h1>'+(S.example?'<p class="sub">Estás viendo un perfil de ejemplo. Pulsa “Borrar mis datos” al final de la página para crear el tuyo.</p>':'<p class="sub">Esto es lo que tienes para hoy y para lo que queda de mes.</p>')+'</div>'+
+  '<div class="cols"><div class="col">'+ticketHtml(m)+quickAdd(m)+chartSpend(m)+catsHtml(m)+'</div><div class="col">'+modeNotes(m)+cardPanel()+upcomingHtml()+topAyudasHtml()+'</div></div>';
+}
+
+/* ayudas */
+function swipeCard(x){
+  var a=x.a;
+  return '<article class="sc swipe-top" data-id="'+a.id+'" aria-label="'+esc(a.t)+'"><div class="sc-top"><span class="chip tag">'+CATL[a.cat]+'</span>'+(a.urg?'<span class="pill warn">Urgente</span>':'')+(a.gratis?'<span class="pill ok">Gratis</span>':'')+'<div class="ring" style="--p:'+x.score+'" aria-label="Encaje del '+x.score+' %"><span>'+x.score+'%</span></div></div>'+
+  '<h3>'+esc(a.t)+'</h3><p class="sc-imp num">'+esc(a.imp)+'</p><p class="sc-d">'+esc(a.d)+'</p>'+
+  '<ul class="reasons">'+x.checks.map(function(c){return '<li class="'+(c.ok?'y':'n')+'"><span aria-hidden="true">'+(c.ok?'✓':'–')+'</span>'+esc(c.l)+'</li>';}).join('')+'</ul>'+
+  '<p class="hint"><strong>Plazo:</strong> '+esc(a.plazo)+'</p>'+
+  '<details><summary>Cómo pedirla</summary><ol>'+a.pasos.map(function(s){return '<li>'+esc(s)+'</li>';}).join('')+'</ol></details></article>';
+}
+function vAyudas(){
+  var all=matchAll();
+  var q=all.filter(function(x){return S.saved.indexOf(x.a.id)<0&&S.discarded.indexOf(x.a.id)<0&&(ayFilter==='todas'||x.a.cat===ayFilter||(ayFilter==='urgentes'&&(x.a.urg||x.a.gratis)));});
+  var saved=all.filter(function(x){return S.saved.indexOf(x.a.id)>=0;});
+  var total=saved.reduce(function(a,x){return a+x.a.val;},0);
+  var fl=[['todas','Todas'],['urgentes','Urgentes y gratis']].concat(Object.keys(CATL).map(function(k){return [k,CATL[k]];}));
+  var deck=q.length?(q[2]?'<div class="sc ghost" data-i="2"></div>':'')+(q[1]?'<div class="sc ghost" data-i="1"></div>':'')+swipeCard(q[0]):'<div class="sc"><h3>No quedan ayudas en este filtro</h3><p class="sc-d">Has revisado todas. Puedes volver a ver las que descartaste.</p><button class="btn primary" data-act="resetDisc">Volver a verlas</button></div>';
+  return '<div><h1>Ayudas y ofertas</h1><p class="sub">Cruzamos tu edad, estudios, código postal, vivienda e ingresos con cada ayuda. Desliza a la derecha para guardar y a la izquierda para descartar.</p></div>'+
+  '<div class="chips" role="group" aria-label="Filtrar ayudas">'+fl.map(function(f){return '<button class="chip" data-act="ayFilter" data-v="'+f[0]+'" aria-pressed="'+(ayFilter===f[0])+'">'+f[1]+'</button>';}).join('')+'</div>'+
+  '<div class="cols"><div class="col"><div class="deck" id="deck">'+deck+'</div>'+
+  (q.length?'<div class="decide"><button class="btn danger" data-act="decide" data-v="l">Descartar</button><button class="btn" data-act="undoDecide"'+(S.hist.length?'':' disabled')+'>Deshacer</button><button class="btn primary" data-act="decide" data-v="r">Guardar</button></div><p class="hint" style="text-align:center">'+q.length+' por revisar. Los importes y plazos son orientativos: confirma siempre en la convocatoria oficial.</p>':'')+'</div>'+
+  '<div class="col"><section class="panel"><h2>Tus guardadas<span class="num">'+saved.length+'</span></h2>'+
+  (saved.length?'<ul class="list">'+saved.map(function(x){return '<li><span class="l"><strong>'+esc(x.a.t)+'</strong><small>'+esc(x.a.imp)+'</small></span><button class="btn sm ghost" data-act="unsave" data-id="'+x.a.id+'">Quitar</button></li>';}).join('')+'</ul>'+(total?'<p class="hint">Valor máximo orientativo al año: <strong class="num">'+eur(total)+'</strong>. Algunas se acumulan y otras no.</p>':'')+'<a class="btn" href="#calendario">Ver fechas en el calendario</a>':'<p class="hint">Guarda las que te interesen y te avisaremos en el calendario.</p>')+'</section>'+
+  '<section class="panel"><h2>Fuentes</h2><p class="hint">Cuantías de la beca MEC según <a href="https://www.xataka.com/basics/becas-mec-2026-2027-cuantias-como-solicitarlas-cuales-requisitos" target="_blank" rel="noopener">Xataka</a>. Requisitos del Bono Alquiler Joven según <a href="https://www.que.es/2026/05/02/bono-alquiler-joven-2026-plazos-requisitos/" target="_blank" rel="noopener">Qué.es</a>. El resto son datos de demostración.</p></section></div></div>';
+}
+
+/* calendario */
+function vCalendario(){
+  var y=calCur.y,mo=calCur.m,n=dim(y,mo),first=(new Date(y,mo,1).getDay()+6)%7,todayK=ymd(new Date());
+  var cells='';
+  ['L','M','X','J','V','S','D'].forEach(function(d){cells+='<div class="dn">'+d+'</div>';});
+  for(var i=0;i<first;i++)cells+='<span class="cd off"></span>';
+  for(var d=1;d<=n;d++){
+    var dt=new Date(y,mo,d),k=ymd(dt),ev=eventsOn(dt),kinds=[];
+    ev.forEach(function(e){if(kinds.indexOf(e.kind)<0)kinds.push(e.kind);});
+    cells+='<button class="cd'+(k===todayK?' today':'')+'" data-act="selDay" data-k="'+k+'" aria-pressed="'+(k===calSel)+'" aria-label="'+d+' de '+MESES[mo]+(ev.length?', '+ev.length+' eventos':'')+'">'+d+'<span class="dots">'+kinds.slice(0,3).map(function(x){return '<i class="dot '+x+'"></i>';}).join('')+'</span></button>';
+  }
+  var sel=parse(calSel),evs=eventsOn(sel);
+  var monthList=[];for(var j=1;j<=n;j++){eventsOn(new Date(y,mo,j)).forEach(function(e){monthList.push(e);});}
+  return '<div><h1>Calendario</h1><p class="sub">Tus gastos fijos, cobros, plazos de ayudas y retos en un solo sitio. Cada evento se puede llevar a Google Calendar e invitar a quien comparta gasto contigo.</p></div>'+
+  '<div class="cols"><div class="col"><section class="panel"><div class="cal-h"><button class="btn sm" data-act="calPrev" aria-label="Mes anterior">←</button><h2>'+MESES[mo].charAt(0).toUpperCase()+MESES[mo].slice(1)+' '+y+'</h2><button class="btn sm" data-act="calNext" aria-label="Mes siguiente">→</button></div><div class="cal">'+cells+'</div>'+
+  '<div class="legend"><span><span class="kind gasto"></span>Gasto fijo</span><span><span class="kind ingreso"></span>Cobro</span><span><span class="kind ayuda"></span>Ayuda</span><span><span class="kind reto"></span>Reto</span><span><span class="kind"></span>Aviso</span></div></section></div>'+
+  '<div class="col"><section class="panel"><h2>'+esc(sel.toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'long'}))+'</h2>'+
+  (evs.length?'<ul class="list">'+evs.map(function(e){return '<li><span class="l"><span class="kind '+e.kind+'"></span>'+esc(e.title)+(e.amt?' · <span class="num">'+eur(e.amt)+'</span>':'')+(e.rec?'<small>Se repite cada mes</small>':'')+(e.guests?'<small>Invitados: '+esc(e.guests)+'</small>':'')+(e.note?'<small>'+esc(e.note)+'</small>':'')+'</span><span class="row"><a class="btn sm" href="'+esc(gcalUrl(e))+'" target="_blank" rel="noopener">Google Calendar</a>'+(!e.rec&&e.kind!=='ayuda'&&e.kind!=='reto'?'<button class="btn sm ghost" data-act="delEvent" data-id="'+e.id+'">Borrar</button>':'')+'</span></li>';}).join('')+'</ul>':'<p class="hint">No hay nada este día.</p>')+'</section>'+
+  '<form class="panel" data-form="evento"><h2>Añadir evento</h2><div class="form-g">'+
+  '<label class="f"><span>Título</span><input id="ev-title" name="title" required maxlength="60" placeholder="Pagar la luz"></label>'+
+  '<label class="f"><span>Fecha</span><input id="ev-date" name="date" type="date" required value="'+calSel+'"></label>'+
+  '<label class="f"><span>Tipo</span><select id="ev-kind" name="kind"><option value="gasto">Gasto</option><option value="ingreso">Cobro</option><option value="aviso">Aviso</option></select></label>'+
+  '<label class="f"><span>Importe (€)</span><input id="ev-amt" name="amt" type="number" min="0" step="0.01" placeholder="Opcional"></label></div>'+
+  '<label class="f"><span>Invitar a (emails separados por comas)</span><input id="ev-guests" name="guests" type="text" placeholder="compi1@correo.com, compi2@correo.com"></label>'+
+  '<button class="btn primary" type="submit">Guardar evento</button></form>'+
+  '<section class="panel"><h2>Llévatelo a tu calendario</h2><p class="hint">Copia los eventos de este mes en formato .ics y pégalos en un archivo para importarlo en Apple Calendar, Outlook o Google Calendar.</p><button class="btn" data-act="copyIcs">Copiar eventos del mes (.ics)</button></section></div></div>';
+}
+
+/* retos */
+function vRetos(){
+  var pt=points(),lv=level(pt),next=lv.next,pct=next?Math.round((pt-lv.from)/(next[0]-lv.from)*100):100;
+  var invite='¡Únete a mi reto de ahorro en Fin de Mes! Vamos a ver quién llega mejor a fin de mes: '+location.href.split('#')[0];
+  var savedTot=0;Object.keys(S.joined).forEach(function(id){var s=retoStats(id);if(s)savedTot+=s.saved;});
+  var cards=RETOS.map(function(r){
+    var s=retoStats(r.id),rank='';
+    if(s){var arr=[{n:'Tú',d:s.days,me:1}].concat(AMIGOS.map(function(a){return {n:a,d:friendDays(a,r)};})).sort(function(a,b){return b.d-a.d;});
+      rank='<details><summary>Clasificación con amigos (ejemplo)</summary><ol class="rank">'+arr.map(function(x,i){return '<li class="'+(x.me?'me':'')+'"><span class="num">'+(i+1)+'</span><span>'+esc(x.n)+'</span><span class="num">'+x.d+'/'+r.dias+' días</span></li>';}).join('')+'</ol></details>';}
+    return '<article class="panel"><div class="row"><span class="chip tag">'+esc(r.c)+'</span><span class="hint num">'+r.dias+' días · '+r.pts+' pts/día</span></div><h3>'+esc(r.t)+'</h3><p class="sc-d">'+esc(r.d)+'</p>'+
+    (s?'<div class="meter" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="'+s.pct+'" aria-label="Progreso"><i style="width:'+s.pct+'%"></i></div><p class="hint num">'+s.days+' de '+r.dias+' días · racha '+s.streak+' · ahorro estimado '+eur(s.saved)+'</p>'+
+      '<div class="row"><button class="btn primary sm" data-act="checkin" data-id="'+r.id+'"'+(s.today||s.done?' disabled':'')+'>'+(s.done?'Reto superado':s.today?'Hoy ya está':'Hoy lo he cumplido')+'</button><button class="btn sm ghost" data-act="leave" data-id="'+r.id+'">Salir</button></div>'+rank:
+      '<button class="btn primary sm" data-act="join" data-id="'+r.id+'">Unirme al reto</button>')+'</article>';
+  }).join('');
+  return '<div><h1>Retos entre amigos</h1><p class="sub">Elige un reto, apunta cada día que lo cumples y compara tu racha con la de tus amigos.</p></div>'+
+  '<section class="panel"><div class="lvl"><div><span class="hint">Tu nivel</span><br><strong>'+lv.name+'</strong></div><div style="flex:1 1 220px;min-width:0"><div class="meter" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="'+pct+'" aria-label="Progreso de nivel"><i style="width:'+pct+'%"></i></div><p class="hint num">'+pt+' puntos'+(next?' · '+(next[0]-pt)+' para '+next[1]:' · nivel máximo')+'</p></div><div><span class="hint">Ahorro estimado</span><br><strong class="num">'+eur(savedTot)+'</strong></div></div>'+
+  '<div class="row"><button class="btn" data-act="copyInvite" data-t="'+esc(invite)+'">Copiar invitación para amigos</button><span class="hint">Los amigos de la clasificación son de ejemplo. Sincronizar con amigos reales necesita cuentas y servidor.</span></div></section>'+
+  '<div class="grid">'+cards+'</div>';
+}
+
+/* simulador */
+function simOut(){
+  var s=simInit(),c=simCalc(s,s.n),p=S.profile;
+  var verdict=c.ok?'ok':c.ratio<=0.40?'warn':'bad';
+  var pct=isFinite(c.ratio)?Math.round(c.ratio*100):0;
+  var minInc=c.net/0.30,maxShare=0.30*s.ingresos+(c.elig&&s.bono?250:0);
+  var title=c.ok?'Sí te salen las cuentas':verdict==='warn'?'Casi: te pasas del 30 %':'Todavía no te salen';
+  var detail=c.ok?'Pagarías '+eur(c.net)+' de alquiler al mes, el '+pct+' % de tus ingresos.':'Pagarías '+eur(c.net)+' al mes ('+(isFinite(c.ratio)?pct+' % de tus ingresos':'no hay ingresos')+'). Necesitas '+eur(minInc)+' al mes de ingresos o un alquiler de hasta '+eur(maxShare)+' por persona.';
+  var total=c.net+s.vida,scale=Math.max(s.ingresos,total,1),libre=Math.max(0,s.ingresos-total),def=Math.max(0,total-s.ingresos);
+  var w=function(v){return (v/scale*100).toFixed(2)+'%';};
+  var stack='<div class="stack" role="img" aria-label="Reparto de tus ingresos"><i class="a" style="width:'+w(c.net)+'"></i><i class="b" style="width:'+w(s.vida)+'"></i>'+(libre?'<i class="c" style="width:'+w(libre)+'"></i>':'')+(def?'<i class="d" style="width:'+w(0)+'"></i>':'')+'<span class="mk" style="left:'+(0.30*s.ingresos/scale*100).toFixed(2)+'%" title="30 % de tus ingresos"></span></div>'+
+    '<div class="legend"><span><span class="kind" style="background:var(--accent)"></span>Alquiler '+eur(c.net)+'</span><span><span class="kind"></span>Gastos de vida '+eur(s.vida)+'</span>'+(libre?'<span><span class="kind ingreso"></span>Te sobran '+eur(libre)+'</span>':'<span><span class="kind gasto"></span>Te faltan '+eur(def)+'</span>')+'<span>Línea discontinua: 30 % de tus ingresos</span></div>';
+  var W=560,H=230,L=40,R=10,T=18,B=34,pw=W-L-R,ph=H-T-B,bw=pw/6;
+  var Y=function(v){return T+ph-Math.min(1,v)*ph;};
+  var bars='';
+  for(var n=1;n<=6;n++){
+    var r=simCalc(s,n),v=isFinite(r.ratio)?r.ratio:1,x=L+(n-1)*bw+bw*0.18,bwid=bw*0.64,top=Y(v);
+    bars+='<rect x="'+x.toFixed(1)+'" y="'+top.toFixed(1)+'" width="'+bwid.toFixed(1)+'" height="'+(Y(0)-top).toFixed(1)+'" fill="'+(r.ok?'var(--ok)':'var(--bad)')+'" rx="2"/>'+
+      '<text class="tx b" x="'+(x+bwid/2).toFixed(1)+'" y="'+(top-5).toFixed(1)+'" text-anchor="middle">'+(v>=1?'+100':Math.round(v*100))+' %</text>'+
+      '<text class="tx" x="'+(x+bwid/2).toFixed(1)+'" y="'+(H-12)+'" text-anchor="middle">'+n+(n===1?' persona':' personas')+'</text>';
+  }
+  var yl=[0,.3,.6,1].map(function(f){return '<line x1="'+L+'" x2="'+(W-R)+'" y1="'+Y(f).toFixed(1)+'" y2="'+Y(f).toFixed(1)+'" stroke="'+(f===.3?'var(--ink)':'var(--line)')+'" stroke-width="'+(f===.3?1.5:1)+'" '+(f===.3?'stroke-dasharray="5 4"':'')+'/><text class="tx'+(f===.3?' b':'')+'" x="'+(L-6)+'" y="'+(Y(f)+4).toFixed(1)+'" text-anchor="end">'+Math.round(f*100)+'%</text>';}).join('');
+  var chart='<svg class="ch" viewBox="0 0 '+W+' '+H+'" role="img" aria-label="Porcentaje de tus ingresos que se va en alquiler según con cuántas personas compartas piso">'+yl+bars+'</svg><div class="legend"><span><span class="kind ingreso"></span>Dentro del 30 %</span><span><span class="kind gasto"></span>Por encima del 30 %</span></div>';
+  var li=function(ok,t){return '<li class="'+(ok?'y':'n')+'"><b aria-hidden="true">'+(ok?'✓':'✗')+'</b><span>'+t+'</span></li>';};
+  var checks='<ul class="chk">'+li(c.ageOk,'Edad entre 18 y 35 años ('+p.edad+')')+li(c.incOk,'Ingresos por debajo de 3 veces el IPREM (unos 2.100 € al mes)')+li(c.rentOk,s.tipo==='habitacion'?'Tu parte del alquiler ('+eur(c.share)+') no supera el tope de '+eur(s.tope):'El alquiler total ('+eur(s.rent)+') no supera el tope de '+eur(s.tope))+'</ul>';
+  return '<div class="verdict '+verdict+'"><h2>'+title+'</h2><p>'+detail+'</p></div>'+
+    '<section class="panel"><h2>Cómo se reparten tus ingresos</h2>'+stack+'</section>'+
+    '<section class="panel"><h2>Según con cuántas personas compartas</h2>'+chart+'</section>'+
+    '<section class="panel"><h2>Requisitos del Bono Alquiler Joven</h2>'+checks+'<p class="hint">Los topes de alquiler cambian según la comunidad. Algunas, como Madrid, Cataluña o Baleares, los han subido. Ajusta el tope a tu convocatoria.</p></section>';
+}
+function vEmancipacion(){
+  var s=simInit();
+  return '<div><h1>Simulador de emancipación</h1><p class="sub">Introduce lo que ganas con un trabajo a tiempo parcial o prácticas. Comprobamos si, con el Bono Alquiler Joven y compartiendo piso, el alquiler se queda por debajo del 30 % de tus ingresos.</p></div>'+
+  '<div class="cols"><section class="panel sticky"><h2>Tu caso</h2>'+
+  '<label class="f"><span>Ingresos netos al mes (€)</span><input id="sm-ing" type="number" min="0" step="10" data-sim="ingresos" value="'+s.ingresos+'"></label>'+
+  '<label class="f"><span>Alquiler total del piso (€ al mes)</span><input id="sm-rent" type="number" min="0" step="10" data-sim="rent" value="'+s.rent+'"></label>'+
+  '<label class="f"><span>Personas en el piso: <output id="sm-n-o" class="num">'+s.n+'</output></span><input id="sm-n" type="range" min="1" max="6" step="1" data-sim="n" value="'+s.n+'"></label>'+
+  '<label class="f"><span>Gastos de vida al mes: comida, suministros, transporte (€)</span><input id="sm-vida" type="number" min="0" step="10" data-sim="vida" value="'+s.vida+'"></label>'+
+  '<label class="f"><span>Tipo de contrato</span><select id="sm-tipo" data-sim="tipo"><option value="habitacion"'+(s.tipo==='habitacion'?' selected':'')+'>Una habitación</option><option value="piso"'+(s.tipo==='piso'?' selected':'')+'>El piso completo</option></select></label>'+
+  '<label class="f"><span>Tope de alquiler de tu comunidad (€)</span><input id="sm-tope" type="number" min="0" step="10" data-sim="tope" value="'+s.tope+'"></label>'+
+  '<label class="sw"><input id="sm-bono" type="checkbox" data-sim="bono"'+(s.bono?' checked':'')+'>Aplicar el Bono Alquiler Joven (250 € al mes)</label>'+
+  '<button class="btn primary" data-act="simPlan">Crear plan de primer piso</button></section>'+
+  '<div class="col" id="sim-out">'+simOut()+'</div></div>';
+}
+
+/* planes */
+function planInfo(def){
+  var st=S.plans[def.id],m=model();
+  var target=st?st.target:def.def(),monthly=st?st.monthly:Math.max(10,m.ahorro||50),saved=st?st.saved:0,left=Math.max(0,target-saved);
+  var months=monthly>0?Math.ceil(left/monthly):Infinity;
+  return {on:!!(st&&st.on),target:target,monthly:monthly,saved:saved,left:left,months:months,pct:target?Math.min(100,Math.round(saved/target*100)):0};
+}
+function vPlanes(){
+  var rec=PLAN_REC[S.mode];
+  return '<div><h1>Planes de ahorro</h1><p class="sub">Elige una meta, ajusta cuánto puedes apartar al mes y te decimos cuándo llegas. Este contenido es informativo, no asesoramiento financiero.</p></div>'+
+  '<div class="grid">'+PLANES.map(function(d){
+    var i=planInfo(d),when='';
+    if(i.left<=0)when='Meta conseguida';
+    else if(isFinite(i.months)){var dt=new Date();dt.setMonth(dt.getMonth()+i.months);when='Llegas en '+i.months+(i.months===1?' mes':' meses')+' ('+MESES[dt.getMonth()]+' '+dt.getFullYear()+')';}
+    else when='Sube la aportación para llegar';
+    return '<article class="panel plan'+(i.on?' on':'')+'"><div class="row">'+(rec.indexOf(d.id)>=0?'<span class="pill ok">Recomendado en modo '+MODES[S.mode].l+'</span>':'')+(i.on?'<span class="pill warn">Activo</span>':'')+'</div><h3>'+esc(d.t)+'</h3><p class="sc-d">'+esc(d.d)+'</p>'+
+    '<div class="form-g"><label class="f"><span>Meta (€)</span><input id="pl-t-'+d.id+'" type="number" min="0" step="10" data-plan="'+d.id+'" data-k="target" value="'+i.target+'"></label><label class="f"><span>Aportación al mes (€)</span><input id="pl-m-'+d.id+'" type="number" min="0" step="5" data-plan="'+d.id+'" data-k="monthly" value="'+i.monthly+'"></label></div>'+
+    '<div class="meter" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="'+i.pct+'" aria-label="Progreso del plan"><i style="width:'+i.pct+'%"></i></div><p class="hint num">'+eur(i.saved)+' de '+eur(i.target)+' · '+esc(when)+'</p>'+
+    (i.on?'<div class="row"><button class="btn sm" data-act="aporta" data-id="'+d.id+'" data-v="10">+10 €</button><button class="btn sm" data-act="aporta" data-id="'+d.id+'" data-v="25">+25 €</button><button class="btn sm" data-act="aporta" data-id="'+d.id+'" data-v="50">+50 €</button><button class="btn sm ghost" data-act="planOff" data-id="'+d.id+'">Quitar</button></div>':'<button class="btn primary sm" data-act="planOn" data-id="'+d.id+'">Activar plan</button>')+
+    '<details><summary class="hint">Pasos</summary><ol>'+d.steps.map(function(x){return '<li>'+esc(x)+'</li>';}).join('')+'</ol></details></article>';
+  }).join('')+'</div>';
+}
+
+/* asistente */
+function bubble(x){
+  return '<div class="b'+(x.r==='u'?' u':'')+(x.alert?' alert':'')+'"><p>'+fmt(x.t)+'</p>'+((x.acts&&x.acts.length)?'<div class="acts">'+x.acts.map(function(a){return '<a class="btn sm" href="'+esc(a.h)+'"'+(a.ext?' target="_blank" rel="noopener"':'')+'>'+esc(a.l)+'</a>';}).join('')+'</div>':'')+'</div>';
+}
+function vAsistente(){
+  ensureChat();
+  return '<div><h1>Asistente</h1><p class="sub">Pregúntale si puedes permitirte algo, pídele un recordatorio o que bloquee tu tarjeta. Responde con las reglas de tu presupuesto, sin conexión a ningún servicio externo.</p></div>'+
+  '<div class="cols"><section class="panel chatp"><div id="chatlog" class="chat" role="log" aria-live="polite">'+S.chat.map(bubble).join('')+'</div>'+
+  '<div class="sugs">'+SUG.map(function(q){return '<button class="chip" data-act="ask" data-q="'+esc(q)+'">'+esc(q)+'</button>';}).join('')+'</div>'+
+  '<form class="chatform" data-form="chat"><label class="sr" for="chat-in">Mensaje</label><input id="chat-in" autocomplete="off" placeholder="Escribe tu pregunta"><button class="btn primary" type="submit">Enviar</button></form></section>'+
+  '<div class="col">'+cardPanel()+'</div></div>';
+}
+
+/* registro */
+function vWelcome(){
+  return '<div class="wrap welcome"><div><h1>Sabes cuánto puedes gastar <span class="hl">hoy</span>.</h1><p class="lead">Cuéntanos cuánto entra y cuánto sale cada mes. Te damos tu límite diario, las ayudas que te corresponden y te decimos si te salen las cuentas para independizarte.</p><div class="row"><button class="btn primary" data-act="obStart">Crear mi perfil</button><button class="btn" data-act="example">Ver con un perfil de ejemplo</button></div><p class="hint" style="margin-top:14px">Tus datos se guardan solo en este navegador. No se conecta a ningún banco.</p></div>'+
+  '<div class="ticket" aria-label="Ejemplo de ticket"><div class="tk-head"><span>Ticket de hoy · ejemplo</span><span>8 de noviembre</span></div><dl class="tk-lines"><div><dt>Presupuesto del mes</dt><dd>483 €</dd></div><div><dt>Gastado hasta hoy</dt><dd>− 129,00 €</dd></div><div><dt>Te quedan</dt><dd>354,00 €</dd></div><div><dt>Días por delante, hoy incluido</dt><dd>÷ 23</dd></div></dl><div class="tk-total"><span>Hoy puedes gastar</span><strong class="hl num">15,39 €</strong></div></div></div>';
+}
+function vOnboard(){
+  var d=D,st=d.step,titles=['Sobre ti','Lo que entra cada mes','Lo que sale siempre','Tu estilo de vida','Tu objetivo y avisos'];
+  var fi=function(id,label,path,val,attrs){return '<label class="f"><span>'+label+'</span><input id="'+id+'" data-d="'+path+'" value="'+esc(val)+'" '+(attrs||'')+'></label>';};
+  var body='';
+  if(st===0)body='<div class="form-g">'+fi('o-nombre','Nombre','nombre',d.nombre,'autocomplete="given-name" maxlength="30"')+fi('o-edad','Edad','edad',d.edad,'type="number" min="14" max="60"')+
+    '<label class="f"><span>Estudios</span><select id="o-est" data-d="estudios">'+ESTUDIOS.map(function(e){return '<option'+(d.estudios===e?' selected':'')+'>'+e+'</option>';}).join('')+'</select></label>'+fi('o-centro','Universidad o centro','centro',d.centro,'maxlength="60"')+fi('o-cp','Código postal','cp',d.cp,'inputmode="numeric" maxlength="5" autocomplete="postal-code"')+
+    '<label class="f"><span>Ingresos anuales de tu familia</span><select id="o-renta" data-d="renta">'+RENTAS.map(function(r,i){return '<option value="'+(i+1)+'"'+(+d.renta===i+1?' selected':'')+'>'+r+'</option>';}).join('')+'</select></label>'+
+    '<label class="f"><span>Dónde vives</span><select id="o-viv" data-d="vivienda"><option value="familia"'+(d.vivienda==='familia'?' selected':'')+'>Con mi familia</option><option value="piso"'+(d.vivienda==='piso'?' selected':'')+'>En un piso de alquiler</option><option value="residencia"'+(d.vivienda==='residencia'?' selected':'')+'>En una residencia</option></select></label></div>';
+  if(st===1)body='<div class="form-g">'+fi('o-i1','Beca o ayudas (€)','ingresos.beca',d.ingresos.beca,'type="number" min="0" step="10"')+fi('o-i2','Trabajo o prácticas (€)','ingresos.trabajo',d.ingresos.trabajo,'type="number" min="0" step="10"')+fi('o-i3','Familia (€)','ingresos.familia',d.ingresos.familia,'type="number" min="0" step="10"')+fi('o-i4','Otros (€)','ingresos.otros',d.ingresos.otros,'type="number" min="0" step="10"')+fi('o-dia','Día del mes en que cobras','diaCobro',d.diaCobro,'type="number" min="1" max="31"')+'</div>';
+  if(st===2)body='<p class="hint">La comida y el ocio no van aquí: los controlamos dentro de tu presupuesto del mes.</p><div class="form-g">'+fi('o-g1','Alquiler o residencia (€)','gastos.vivienda',d.gastos.vivienda,'type="number" min="0" step="10"')+fi('o-g2','Transporte (€)','gastos.transporte',d.gastos.transporte,'type="number" min="0" step="5"')+fi('o-g3','Móvil e internet (€)','gastos.movil',d.gastos.movil,'type="number" min="0" step="5"')+fi('o-g4','Suscripciones (€)','gastos.suscripciones',d.gastos.suscripciones,'type="number" min="0" step="5"')+fi('o-g5','Otros fijos (€)','gastos.otros',d.gastos.otros,'type="number" min="0" step="5"')+'</div>';
+  if(st===3)body='<div class="f"><span>Qué te gusta (elige los que quieras)</span><div class="chips">'+GUSTOS.map(function(g){return '<button type="button" class="chip" data-act="gusto" data-v="'+g[0]+'" aria-pressed="'+(d.gustos.indexOf(g[0])>=0)+'">'+g[1]+'</button>';}).join('')+'</div></div>'+
+    '<label class="f"><span>Tu estilo</span><select id="o-estilo" data-d="estilo"><option value="casero"'+(d.estilo==='casero'?' selected':'')+'>Casero: cocino y salgo poco</option><option value="equilibrado"'+(d.estilo==='equilibrado'?' selected':'')+'>Equilibrado</option><option value="social"'+(d.estilo==='social'?' selected':'')+'>Social: salgo mucho</option></select></label>'+
+    '<label class="f"><span>Salidas a la semana: <output id="o-sal-o" class="num">'+d.salidas+'</output></span><input id="o-sal" type="range" min="0" max="6" step="1" data-d="salidas" value="'+d.salidas+'"></label>';
+  if(st===4){var ing=sumObj(d.ingresos),fij=sumObj(d.gastos);body='<div class="form-g">'+fi('o-ah','Ahorro mensual que quieres apartar (€)','ahorro',d.ahorro,'type="number" min="0" step="5"')+fi('o-ob','¿Para qué ahorras?','objetivo',d.objetivo,'maxlength="40" placeholder="Viaje, fondo de emergencia..."')+'</div><p class="hint">Ingresos <strong class="num">'+eur(ing)+'</strong> − gastos fijos <strong class="num">'+eur(fij)+'</strong> − ahorro <strong class="num">'+eur(num(d.ahorro))+'</strong> = presupuesto para comida, ocio y extras: <strong class="num">'+eur(Math.max(0,ing-fij-num(d.ahorro)))+'</strong> al mes.</p><p class="hint">Podrás cambiar el bloqueo de tarjeta y los avisos en cualquier momento desde el asistente.</p>';}
+  return '<div class="wrap ob"><div class="steps" aria-hidden="true">'+titles.map(function(_,i){return '<i class="'+(i<=st?'on':'')+'"></i>';}).join('')+'</div><div><p class="hint num">Paso '+(st+1)+' de 5</p><h1 style="font-size:clamp(26px,4vw,36px)">'+titles[st]+'</h1></div>'+body+(d.err?'<p class="err" role="alert">'+esc(d.err)+'</p>':'')+
+  '<div class="row">'+(st>0?'<button class="btn" data-act="obBack">Atrás</button>':'<button class="btn ghost" data-act="obCancel">Volver</button>')+(st<4?'<button class="btn primary" data-act="obNext">Siguiente</button>':'<button class="btn primary" data-act="obFinish">Terminar</button>')+'</div></div>';
+}
+var VIEWS={inicio:vInicio,ayudas:vAyudas,calendario:vCalendario,retos:vRetos,grupos:vGrupos,emancipacion:vEmancipacion,planes:vPlanes,asistente:vAsistente};
+
+/* ---------- SOS ---------- */
+function openSOS(){
+  if(!S.profile)return;
+  var m=model(),el=$('#sos');
+  var top=matchAll().filter(function(x){return x.a.urg||x.a.gratis;}).slice(0,3);
+  var ideas=(S.profile.gustos||[]).map(function(g){return IDEAS_GRATIS[g];}).filter(Boolean).slice(0,3);
+  if(ideas.length<3)ideas=ideas.concat(['Paseo por un parque o por tu barrio','Película en casa con amigos','Biblioteca con wifi y sala de estudio']).slice(0,3);
+  var perDay=m.remaining>0?m.remaining/m.daysLeft:0;
+  var noEss=Object.keys(CATS).filter(function(k){return !CATS[k].e;}).map(function(k){return CATS[k].l;});
+  el.innerHTML='<div class="sheet"><div class="row" style="justify-content:space-between"><h2>Modo Supervivencia</h2><button class="btn sm" data-act="sosClose" id="sos-x">Cerrar</button></div>'+
+  '<div class="ticket"><div class="tk-head"><span>Lo que queda</span><span>'+m.daysLeft+' días</span></div><div class="tk-total"><span>'+(m.remaining>0?'Máximo por día':'Ya estás por encima')+'</span><strong class="hl num">'+(m.remaining>0?eur(perDay,2):eur(-m.remaining,2))+'</strong></div></div>'+
+  '<div><h3>1. Ayudas para hoy</h3><ul class="chk">'+top.map(function(x){return '<li class="y"><b aria-hidden="true">✓</b><span><strong>'+esc(x.a.t)+'</strong>: '+esc(x.a.imp)+'</span></li>';}).join('')+'</ul><a class="btn sm" href="#ayudas" data-act="sosGo" data-v="urgentes" style="margin-top:8px">Abrir ayudas urgentes</a></div>'+
+  '<div><h3>2. Congela esto</h3><p class="hint">'+noEss.join(', ')+'. Te avisaré si apuntas un gasto ahí.</p></div>'+
+  '<div><h3>3. Pausa suscripciones</h3><p class="hint">Tus suscripciones suman <strong class="num">'+eur(S.profile.gastos.suscripciones||0)+'</strong> al mes. Pausa las que no uses hasta que cobres.</p></div>'+
+  '<div><h3>4. Comer barato</h3><ul><li>Legumbres con arroz y verduras</li><li>Pasta con tomate y huevo</li><li>Tortilla de patata para dos días</li><li>Avena con fruta para desayunar</li></ul><p class="hint">Cocina por lotes el domingo y congela raciones.</p></div>'+
+  '<div><h3>5. Ocio gratis</h3><ul>'+ideas.map(function(i){return '<li>'+esc(i)+'</li>';}).join('')+'</ul></div>'+
+  '<div class="row">'+(S.mode==='supervivencia'?'<span class="pill bad">Modo Supervivencia activo</span>':'<button class="btn primary" data-act="sosActivate">Activar Modo Supervivencia</button>')+'<a class="btn" href="#asistente" data-act="sosClose">Hablar con el asistente</a></div></div>';
+  el.hidden=false;var x=$('#sos-x');if(x)x.focus();
+}
+function closeSOS(){$('#sos').hidden=true;}
+
+/* ---------- render ---------- */
+function render(keep){
+  var y=window.scrollY,app=$('#app'),view=curView();
+  if(!S.profile){app.dataset.mode='normal';app.innerHTML=D?vOnboard():vWelcome();if(keep===false)window.scrollTo(0,0);else window.scrollTo(0,y);return;}
+  app.dataset.mode=S.mode;
+  app.innerHTML='<header class="top"><div class="wrap topin"><a class="brand" href="#inicio">Fin de <span class="hl">Mes</span></a><div class="seg" role="group" aria-label="Modo de gasto">'+Object.keys(MODES).map(function(k){return '<button class="seg-b" data-act="mode" data-v="'+k+'" aria-pressed="'+(S.mode===k)+'">'+MODES[k].l+'</button>';}).join('')+'</div><button class="btn sos sm" data-act="sos">SOS fin de mes</button></div><nav class="wrap tabs" aria-label="Secciones">'+TABS.map(function(t){return '<a class="tab" href="#'+t[0]+'" aria-current="'+(view===t[0]?'page':'false')+'">'+t[1]+'</a>';}).join('')+'</nav></header>'+
+  '<main class="wrap main" id="main">'+VIEWS[view]()+'</main>'+
+  '<footer class="foot"><div class="wrap"><p>Fin de Mes es un prototipo. La tarjeta, los amigos y las ayudas son simulaciones o datos de demostración. Tus datos se guardan solo en este navegador.</p><button class="btn sm ghost" data-act="reset">'+(resetArmed?'¿Seguro? Pulsa otra vez para borrar':'Borrar mis datos')+'</button></div></footer>';
+  if(keep===false)window.scrollTo(0,0);else window.scrollTo(0,y);
+  var c=$('#chatlog');if(c)c.scrollTop=c.scrollHeight;
+}
+
+/* ---------- acciones ---------- */
+var ACT={
+  mode:function(el){S.mode=el.dataset.v;save();render();toast('Modo '+MODES[S.mode].l+' activado');},
+  sos:function(){openSOS();},
+  sosClose:function(){closeSOS();},
+  sosGo:function(el){ayFilter=el.dataset.v;closeSOS();},
+  sosActivate:function(){S.mode='supervivencia';save();closeSOS();render();toast('Modo Supervivencia activado','bad');say('He activado el **Modo Supervivencia**. Te avisaré si gastas en cosas no esenciales.',true);},
+  toggleCard:function(){S.card.blocked=!S.card.blocked;save();render();toast(S.card.blocked?'Tarjeta bloqueada (simulación)':'Tarjeta desbloqueada (simulación)');},
+  delGasto:function(el){S.gastos=S.gastos.filter(function(g){return g.id!==el.dataset.id;});save();render();},
+  ayFilter:function(el){ayFilter=el.dataset.v;render();},
+  decide:function(el){decide(el.dataset.v);},
+  undoDecide:function(){var h=S.hist.pop();if(!h)return;S.saved=S.saved.filter(function(i){return i!==h;});S.discarded=S.discarded.filter(function(i){return i!==h;});save();render();},
+  resetDisc:function(){S.discarded=[];save();render();},
+  unsave:function(el){S.saved=S.saved.filter(function(i){return i!==el.dataset.id;});save();render();},
+  selDay:function(el){calSel=el.dataset.k;render();},
+  calPrev:function(){calCur.m--;if(calCur.m<0){calCur.m=11;calCur.y--;}render();},
+  calNext:function(){calCur.m++;if(calCur.m>11){calCur.m=0;calCur.y++;}render();},
+  delEvent:function(el){S.events=S.events.filter(function(e){return e.id!==el.dataset.id;});save();render();},
+  copyIcs:function(){var l=[],n=dim(calCur.y,calCur.m);for(var d=1;d<=n;d++)eventsOn(new Date(calCur.y,calCur.m,d)).forEach(function(e){l.push(e);});copy(icsFor(l),'Eventos copiados. Pégalos en un archivo .ics');},
+  join:function(el){S.joined[el.dataset.id]={start:ymd(new Date()),checks:[]};save();render();toast('Te has unido al reto','ok');},
+  leave:function(el){delete S.joined[el.dataset.id];save();render();},
+  checkin:function(el){var j=S.joined[el.dataset.id],k=ymd(new Date());if(j.checks.indexOf(k)<0)j.checks.push(k);save();render();var s=retoStats(el.dataset.id);toast(s.done?'Reto superado. +50 puntos':'Racha de '+s.streak+(s.streak===1?' día':' días'),'ok');},
+  copyInvite:function(el){copy(el.dataset.t,'Invitación copiada');},
+  simPlan:function(){var s=simInit();S.plans.piso={on:true,target:Math.round((2*s.rent/Math.max(1,s.n)+400)/10)*10,monthly:Math.max(10,model().ahorro||50),saved:(S.plans.piso&&S.plans.piso.saved)||0};save();location.hash='#planes';toast('Plan de primer piso activado','ok');},
+  planOn:function(el){var d=PLANES.filter(function(p){return p.id===el.dataset.id;})[0],i=planInfo(d);S.plans[d.id]={on:true,target:i.target,monthly:i.monthly,saved:i.saved};save();render();toast('Plan activado','ok');},
+  planOff:function(el){S.plans[el.dataset.id].on=false;save();render();},
+  aporta:function(el){var p=S.plans[el.dataset.id];p.saved+=+el.dataset.v;save();render();toast('Aportación apuntada','ok');},
+  signup:function(){cloudAuth('up',$('#au-mail').value.trim(),$('#au-pass').value);},
+  signout:function(){sb.auth.signOut().then(function(){cloud.user=null;cloud.groups=[];render();toast('Sesión cerrada','ok');});},
+  gSel:function(el){gSel=el.dataset.id;render();},
+  gExample:function(){var g=gExample();S.groups.push(g);gSel=g.id;save();render();toast('Grupo de ejemplo creado','ok');},
+  gDel:function(el){if(CL()){cloudDo(function(){return sb.from('grupos').delete().eq('id',el.dataset.id);});return;}S.groups=S.groups.filter(function(x){return x.id!==el.dataset.id;});save();render();},
+  gExpDel:function(el){if(CL()){cloudDo(function(){return sb.from('grupo_gastos').delete().eq('id',el.dataset.id);});return;}var g=S.groups.filter(function(x){return x.id===el.dataset.g;})[0];if(g){g.exp=g.exp.filter(function(e){return e.id!==el.dataset.id;});save();render();}},
+  settle:function(el){if(CL()){var cg=cloud.groups.filter(function(x){return x.id===el.dataset.g;})[0];if(cg)cloudDo(function(){return sb.from('grupo_pagos').insert({grupo_id:cg.id,de_id:cg.ids[el.dataset.from],a_id:cg.ids[el.dataset.to],importe_cents:+el.dataset.c});},'Pago apuntado');return;}var g=S.groups.filter(function(x){return x.id===el.dataset.g;})[0];if(g){g.paid.push({from:el.dataset.from,to:el.dataset.to,amt:(+el.dataset.c)/100});save();render();toast('Pago apuntado','ok');}},
+  nudge:function(el){copy(el.dataset.t,'Toque a '+el.dataset.who+' enviado: mensaje copiado (simulación)');},
+  ask:function(el){send(el.dataset.q);},
+  obStart:function(){D=blank();render(false);},
+  example:function(){S.profile=exampleProfile();S.example=true;S.gastos=exampleGastos();S.mode='normal';S.chat=[];save();digest();location.hash='#inicio';render(false);},
+  obCancel:function(){D=null;render(false);},
+  obBack:function(){D.err='';D.step--;render(false);},
+  obNext:function(){var e=validate(D);D.err=e;if(!e)D.step++;render(false);},
+  obFinish:function(){var e=validate(D);D.err=e;if(e){render(false);return;}finishOnboard();},
+  gusto:function(el){var v=el.dataset.v,i=D.gustos.indexOf(v);if(i<0)D.gustos.push(v);else D.gustos.splice(i,1);render();},
+  reset:function(){if(!resetArmed){resetArmed=true;render();setTimeout(function(){resetArmed=false;render();},4000);return;}resetArmed=false;S=defaults();D=null;try{localStorage.removeItem(KEY);}catch(e){}mem=null;location.hash='';render(false);}
+};
+function decide(dir){
+  var top=$('.swipe-top');if(!top)return;
+  var id=top.dataset.id;
+  top.style.transform='translateX('+(dir==='r'?600:-600)+'px) rotate('+(dir==='r'?18:-18)+'deg)';top.style.opacity='0';
+  setTimeout(function(){
+    if(dir==='r'){S.saved.push(id);toast('Guardada. La verás en el calendario si tiene fecha','ok');}else S.discarded.push(id);
+    S.hist.push(id);save();render();
+  },190);
+}
+function blank(){return {step:0,nombre:'',edad:'',estudios:'Grado',centro:'',cp:'',renta:2,vivienda:'piso',ingresos:{beca:'',trabajo:'',familia:'',otros:''},diaCobro:1,gastos:{vivienda:'',transporte:'',movil:'',suscripciones:'',otros:''},gustos:[],estilo:'equilibrado',salidas:2,ahorro:'',objetivo:'',err:''};}
+function validate(d){
+  if(d.step===0){
+    if(!d.nombre.trim())return 'Escribe tu nombre.';
+    var e=parseInt(d.edad,10);if(!(e>=14&&e<=60))return 'Escribe una edad entre 14 y 60 años.';
+    if(!/^\d{5}$/.test(String(d.cp).trim()))return 'El código postal tiene 5 cifras.';
+  }
+  if(d.step===1){var s=sumObj({a:num(d.ingresos.beca),b:num(d.ingresos.trabajo),c:num(d.ingresos.familia),d:num(d.ingresos.otros)});if(s<=0)return 'Indica al menos una fuente de ingresos.';var dia=parseInt(d.diaCobro,10);if(!(dia>=1&&dia<=31))return 'El día de cobro va de 1 a 31.';}
+  return '';
+}
+async function finishOnboard(){
+  var d=D,toN=function(o){var r={};Object.keys(o).forEach(function(k){r[k]=num(o[k]);});return r;};
+  S.profile={nombre:d.nombre.trim(),edad:parseInt(d.edad,10),estudios:d.estudios,centro:d.centro.trim(),cp:String(d.cp).trim(),renta:+d.renta,vivienda:d.vivienda,ingresos:toN(d.ingresos),diaCobro:parseInt(d.diaCobro,10)||1,gastos:toN(d.gastos),gustos:d.gustos.slice(),estilo:d.estilo,salidas:+d.salidas,ahorro:num(d.ahorro),objetivo:d.objetivo.trim()};
+  S.example=false;S.gastos=[];S.chat=[];S.sim=null;D=null;save();digest();location.hash='#inicio';render(false);
+
+  // Sincronizar el perfil con Supabase si el usuario ha iniciado sesión
+  await syncProfileToSupabase();
+}
+function exampleProfile(){return {nombre:'Marta',edad:21,estudios:'Grado',centro:'Universidad de ejemplo',cp:'28012',renta:2,vivienda:'piso',ingresos:{beca:250,trabajo:520,familia:150,otros:0},diaCobro:1,gastos:{vivienda:300,transporte:20,movil:15,suscripciones:22,otros:20},gustos:['cine','musica','cocinar'],estilo:'equilibrado',salidas:2,ahorro:60,objetivo:'Fondo de emergencia'};}
+function exampleGastos(){
+  var t=new Date(),y=t.getFullYear(),mo=t.getMonth(),day=t.getDate();
+  var L=[[1,'comida',38.4,'Compra semanal'],[2,'fuera',9.5,'Menú del día'],[3,'ocio',14,'Cine'],[4,'comida',12.8,'Mercado'],[5,'compras',24.99,'Camiseta'],[6,'fuera',11.2,'Cena con amigos'],[7,'comida',18.1,'Súper']];
+  return L.filter(function(x){return x[0]<day;}).map(function(x){return {id:uid(),fecha:y+'-'+pad(mo+1)+'-'+pad(x[0]),cat:x[1],importe:x[2],concepto:x[3],pago:'tarjeta'};});
+}
+function send(text){
+  text=String(text||'').trim();if(!text)return;
+  S.chat.push({r:'u',t:text});if(AI_ON()&&!isCmd(text)){aiAsk(text);return;}var r=bot(text);S.chat.push({r:'a',t:r.t,acts:r.acts||[]});save();
+  if(curView()!=='asistente'){render();return;}
+  render();var i=$('#chat-in');if(i)i.focus();
+}
+
+/* ---------- eventos ---------- */
+document.addEventListener('click',function(e){
+  var el=e.target.closest('[data-act]');if(!el)return;
+  var f=ACT[el.dataset.act];if(f)f(el,e);
+});
+document.addEventListener('submit',function(e){
+  var f=e.target.closest('form[data-form]');if(!f)return;e.preventDefault();
+  var k=f.dataset.form;
+  if(k==='gasto'){var a=num($('#qa-amt').value);if(!a){toast('Escribe un importe mayor que cero','bad');return;}addGasto(a,$('#qa-cat').value,$('#qa-con').value.trim(),$('#qa-pay').value);}
+  if(k==='evento'){var t=$('#ev-title').value.trim(),dt=$('#ev-date').value;if(!t||!dt)return;S.events.push({id:uid(),title:t,date:dt,kind:$('#ev-kind').value,amt:num($('#ev-amt').value),guests:$('#ev-guests').value.trim().replace(/\s+/g,'')});calSel=dt;var p=parse(dt);calCur={y:p.getFullYear(),m:p.getMonth()};save();render();toast('Evento guardado','ok');}
+  if(k==='auth'){cloudAuth('in',$('#au-mail').value.trim(),$('#au-pass').value);return;}
+  if(k==='join'){var jc=$('#jn-code').value.trim().toLowerCase();cloudDo(function(){return sb.rpc('unirse_grupo',{cod:jc,mi_nombre:S.profile.nombre});},'Te me he unido al grupo');return;}
+  if(k==='grupo'){var fd=new FormData(f),gn=String(fd.get('name')||'').trim(),ms=fd.getAll('m').map(String),gx=String(fd.get('extra')||'').trim().slice(0,20);if(!gn){toast('Ponle un nombre al grupo','bad');return;}if(gx&&gx!==ME&&ms.indexOf(gx)<0)ms.push(gx);if(CL()){cloudNewGroup(gn.slice(0,40),ms);return;}var ng={id:uid(),name:gn.slice(0,40),members:[ME].concat(ms),exp:[],paid:[]};S.groups.push(ng);gSel=ng.id;save();render();toast('Grupo creado','ok');return;}
+  if(k==='gexp'){var fe=new FormData(f),ge=gl().filter(function(x){return x.id===f.dataset.g;})[0],ga=num(fe.get('amt')),gw=fe.getAll('w').map(String),gt=String(fe.get('what')||'').trim();if(!ge||!ga||!gw.length||!gt){toast('Escribe concepto, importe y con quién se reparte','bad');return;}if(CL()){cloudAddExp(ge,gt.slice(0,40),ga,String(fe.get('payer')),gw);return;}ge.exp.push({id:uid(),what:gt.slice(0,40),amt:ga,payer:String(fe.get('payer')),split:gw,date:ymd(new Date())});save();render();toast('Gasto añadido','ok');return;}
+  if(k==='chat'){var i=$('#chat-in');var v=i.value;i.value='';send(v);}
+});
+function onInput(e){
+  var el=e.target;
+  if(el.dataset.d&&D){var v=el.value;if(el.dataset.d==='gusto')return;setPath(D,el.dataset.d,v);if(el.id==='o-sal'){$('#o-sal-o').textContent=v;}}
+  if(el.dataset.sim){var s=simInit(),k=el.dataset.sim;if(k==='bono')s.bono=el.checked;else if(k==='tipo'){s.tipo=el.value;s.tope=el.value==='habitacion'?300:600;var tp=$('#sm-tope');if(tp)tp.value=s.tope;}else if(k==='n'){s.n=+el.value;$('#sm-n-o').textContent=s.n;}else s[k]=num(el.value);save();$('#sim-out').innerHTML=simOut();}
+}
+document.addEventListener('input',onInput);
+document.addEventListener('change',function(e){
+  var el=e.target;
+  if(el.dataset.bind){setPath(S,el.dataset.bind,el.checked);save();render();}
+  if(el.dataset.plan){var d=PLANES.filter(function(p){return p.id===el.dataset.plan;})[0],i=planInfo(d),st=S.plans[d.id]||{on:false,target:i.target,monthly:i.monthly,saved:i.saved};st[el.dataset.k]=num(el.value);S.plans[d.id]=st;save();render();}
+  if(el.dataset.d&&el.tagName==='SELECT'&&D)setPath(D,el.dataset.d,el.value);
+});
+window.addEventListener('hashchange',function(){render(false);});
+document.addEventListener('keydown',function(e){if(e.key==='Escape'&&!$('#sos').hidden)closeSOS();});
+document.addEventListener('click',function(e){var o=$('#sos');if(!o.hidden&&e.target===o)closeSOS();});
+
+/* gesto de deslizar */
+var drag=null;
+document.addEventListener('pointerdown',function(e){
+  var c=e.target.closest('.swipe-top');if(!c||e.target.closest('summary,button,a'))return;
+  drag={c:c,x:e.clientX,dx:0};c.classList.add('drag');try{c.setPointerCapture(e.pointerId);}catch(_){}
+});
+document.addEventListener('pointermove',function(e){
+  if(!drag)return;drag.dx=e.clientX-drag.x;
+  drag.c.style.transform='translateX('+drag.dx+'px) rotate('+(drag.dx/18)+'deg)';
+  if(Math.abs(drag.dx)>30)drag.c.dataset.dir=drag.dx>0?'r':'l';else delete drag.c.dataset.dir;
+});
+function endDrag(){
+  if(!drag)return;var c=drag.c,dx=drag.dx;drag=null;c.classList.remove('drag');delete c.dataset.dir;
+  if(Math.abs(dx)>100)decide(dir==='r'?'r':'l');else c.style.transform='';
+}
+document.addEventListener('pointerup',endDrag);
+document.addEventListener('pointercancel',endDrag);
+
+/* ---------- arranque ---------- */
+if(S.profile)digest();
+render(false);
+cloudInit();

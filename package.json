@@ -1,0 +1,16 @@
+{
+  "name": "fin-de-mes",
+  "version": "1.0.0",
+  "description": "App Fin de Mes",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.45.4"
+  },
+  "devDependencies": {
+    "vite": "^5.0.0"
+  }
+}

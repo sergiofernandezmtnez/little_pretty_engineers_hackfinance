@@ -7,10 +7,12 @@ create extension if not exists pgcrypto;
 -- ===== Datos personales =====
 create table perfiles (
   id uuid primary key references auth.users on delete cascade,
-  nombre text not null, edad int, estudios text, centro text, cp text,
-  renta int, vivienda text, modo text not null default 'normal'
-    check (modo in ('holgado','normal','cuidado','austeridad','rojo','supervivencia')),
-  gustos text[] not null default '{}', created_at timestamptz not null default now()
+  nombre text not null, edad int, estudios text, ccaa text, centro text, ambito text, vivienda text,
+  modo text not null default 'normal' check (modo in ('normal','sos')),
+  gustos text[] not null default '{}',
+  datos jsonb,                                  -- estado completo de la app (perfil, ingresos, gastos, planes...)
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
 );
 create table gastos_fijos (
   id uuid primary key default gen_random_uuid(),
