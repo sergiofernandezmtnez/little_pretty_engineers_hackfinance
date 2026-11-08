@@ -1,3 +1,3 @@
-# STUD€NTIA 🧑‍🎓💰
+# 💸🎓 STUD€NTIA 🧑‍🎓💰
 
     
