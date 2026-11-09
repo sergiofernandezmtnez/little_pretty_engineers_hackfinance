@@ -178,6 +178,7 @@ svg.ch .tx.b{fill:var(--ink);font-weight:600}
 @media (max-width:760px){.qa-row.inc{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}}
 .flow{column-count:2;column-gap:20px}.flow>*{break-inside:avoid;margin:0 0 20px}
 @media (max-width:900px){.flow{column-count:1}}
+.plan-strip{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:10px 0}.plan-strip>div{background:var(--surface-2);border:1px solid var(--line);border-radius:10px;padding:10px 12px;display:grid;gap:2px}.plan-strip strong{font-size:20px}
 .mv-tabs{display:flex;gap:6px}
 .chip.inc[aria-pressed=true]{background:var(--ok);border-color:var(--ok);color:var(--on-bad)}
 .list .inc{color:var(--ok)}
@@ -414,7 +415,7 @@ var SUG=['¿Cuánto puedo gastar hoy?','¿Puedo gastarme 35 € en unas zapatill
 /* ---------- estado ---------- */
 var KEY='finmes.v1';
 var mem=null;
-function defaults(){return {profile:null,mode:'normal',groups:[],gastos:[],saved:[],discarded:[],hist:[],joined:{},events:[],plans:{},card:{blocked:false,auto:true,alertDaily:true,alertPct:true},chat:[],sim:null,ingExtra:[],myRetos:[],retoHist:[],lastDigest:'',example:false,flags:{},closed:{},alerts:{mes:'',hit:[]},modeMonth:''};}
+function defaults(){return {profile:null,mode:'normal',groups:[],gastos:[],saved:[],discarded:[],hist:[],joined:{},events:[],plans:{},card:{blocked:false,auto:true,alertDaily:true,alertPct:true},chat:[],sim:null,ingExtra:[],myRetos:[],retoHist:[],subsPausa:[],misPlanes:[],planesInit:false,lastDigest:'',example:false,flags:{},closed:{},alerts:{mes:'',hit:[]},modeMonth:''};}
 function load(){try{var r=localStorage.getItem(KEY);if(r)return JSON.parse(r);}catch(e){}return mem;}
 var curMes=function(){var t=new Date();return t.getFullYear()+'-'+pad(t.getMonth()+1);};
 var nextMes=function(k){var a=k.split('-').map(Number);a[1]++;if(a[1]>12){a[1]=1;a[0]++;}return a[0]+'-'+pad(a[1]);};
@@ -426,6 +427,8 @@ function fixState(){
   if(!S.ingExtra)S.ingExtra=[];
   if(!S.myRetos)S.myRetos=[];
   if(!S.retoHist)S.retoHist=[];
+  if(!S.subsPausa)S.subsPausa=[];
+  if(!S.misPlanes)S.misPlanes=[];
   if(!S.closed)S.closed={};
   if(!S.alerts)S.alerts={mes:'',hit:[]};
   S.chat=(S.chat||[]).filter(function(m){return !m.pending;});
@@ -452,6 +455,7 @@ var resetArmed=false;
 /* Cierra los meses pasados: lo que no gastaste pasa al mes siguiente y tu ahorro mensual va a tu plan */
 function closeMonths(){
   var p=S.profile;if(!p||!p.inicio)return false;
+  ensurePlanes();
   var cm=curMes(),k=p.inicio,carry=0,changed=false,guard=0;
   while(k<cm&&guard++<240){
     if(S.closed[k]){carry=S.closed[k].out;k=nextMes(k);continue;}
@@ -459,8 +463,7 @@ function closeMonths(){
     var spent=S.gastos.filter(function(g){return g.fecha.indexOf(k)===0;}).reduce(function(a,g){return a+g.importe;},0);
     var ex=extraDe(k),base=Math.max(0,ing-fij-ah)+ex,avail=base+carry,out=Math.max(0,Math.round((avail-spent)*100)/100);
     S.closed[k]={base:base,carryIn:carry,extra:ex,spent:Math.round(spent*100)/100,out:out,ahorro:ah};
-    var od=objDef(p.objetivo);
-    if(ah>0&&od&&S.plans[od.id]&&S.plans[od.id].on){S.plans[od.id].saved=(S.plans[od.id].saved||0)+ah;}
+    if(ah>0)S.misPlanes.forEach(function(q){if(q.aporte>0)q.saved=(q.saved||0)+q.aporte;});
     carry=out;changed=true;k=nextMes(k);
   }
   return changed;
@@ -873,7 +876,7 @@ function noEsenciales(m){return Math.round(m.mg.filter(function(g){return CATS[g
 function aiContext(){
   var m=model(),p=S.profile,r2=function(x){return Math.round((+x||0)*100)/100;},deu=[];
   gl().forEach(function(g){gDebts(g).forEach(function(d){if(d.to===ME)deu.push(d.from+' te debe '+r2(d.c/100)+' € ('+g.name+')');else if(d.from===ME)deu.push('Debes '+r2(d.c/100)+' € a '+d.to+' ('+g.name+')');});});
-  return {fecha:ymd(new Date()),nombre:p.nombre,edad:p.edad,estudios:p.estudios,comunidad_autonoma:p.ccaa||'',universidad:p.centro||'',ambito_estudios:AMB[p.ambito]||'',objetivo_ahorro:(objDef(p.objetivo)||{t:'Ahorro general'}).t,vivienda:p.vivienda,gustos:p.gustos||[],modo:MODES[S.mode].l,ingresos_mes:r2(m.ingresos),ingresos_extra_este_mes:r2(m.extra),ultimos_ingresos_extra:(S.ingExtra||[]).slice(-5).map(function(i){return {fecha:i.fecha,tipo:i.tipo,importe:i.importe,concepto:i.concepto};}),gastos_fijos:r2(m.fijos),ahorro_mensual:r2(m.ahorro),presupuesto_variable_mes:r2(m.budget),gastado_este_mes:r2(m.spent),queda_este_mes:r2(m.remaining),dias_restantes:m.daysLeft,limite_hoy:r2(m.leftToday),ayudas_que_encajan:matchAll().slice(0,5).map(function(x){return {titulo:x.a.t,encaje_pct:x.score,plazo:x.a.plazo};}),deudas_en_grupos:deu,gasto_por_categoria:catSum(m),gasto_no_esencial_mes:noEsenciales(m),ultimos_gastos:S.gastos.slice(-6).map(function(g){return {fecha:g.fecha,cat:g.cat,importe:g.importe,concepto:g.concepto};}),eventos_proximos:(S.events||[]).filter(function(e){return e.date>=ymd(new Date());}).slice(0,5).map(function(e){return {titulo:e.title,fecha:e.date,importe:e.amt};}),planes_activos:PLANES.filter(function(pl){return S.plans[pl.id]&&S.plans[pl.id].on;}).map(function(pl){return pl.t;})};
+  return {fecha:ymd(new Date()),nombre:p.nombre,edad:p.edad,estudios:p.estudios,comunidad_autonoma:p.ccaa||'',universidad:p.centro||'',ambito_estudios:AMB[p.ambito]||'',objetivo_ahorro:(S.misPlanes.length?S.misPlanes.map(nomPlan).join(', '):'Ahorro general'),vivienda:p.vivienda,gustos:p.gustos||[],modo:MODES[S.mode].l,ingresos_mes:r2(m.ingresos),ingresos_extra_este_mes:r2(m.extra),ultimos_ingresos_extra:(S.ingExtra||[]).slice(-5).map(function(i){return {fecha:i.fecha,tipo:i.tipo,importe:i.importe,concepto:i.concepto};}),gastos_fijos:r2(m.fijos),ahorro_mensual:r2(m.ahorro),presupuesto_variable_mes:r2(m.budget),gastado_este_mes:r2(m.spent),queda_este_mes:r2(m.remaining),dias_restantes:m.daysLeft,limite_hoy:r2(m.leftToday),ayudas_que_encajan:matchAll().slice(0,5).map(function(x){return {titulo:x.a.t,encaje_pct:x.score,plazo:x.a.plazo};}),deudas_en_grupos:deu,gasto_por_categoria:catSum(m),gasto_no_esencial_mes:noEsenciales(m),ultimos_gastos:S.gastos.slice(-6).map(function(g){return {fecha:g.fecha,cat:g.cat,importe:g.importe,concepto:g.concepto};}),eventos_proximos:(S.events||[]).filter(function(e){return e.date>=ymd(new Date());}).slice(0,5).map(function(e){return {titulo:e.title,fecha:e.date,importe:e.amt};}),planes_activos:PLANES.filter(function(pl){return S.plans[pl.id]&&S.plans[pl.id].on;}).map(function(pl){return pl.t;})};
 }
 async function aiAsk(text){
   S.chat.push({r:'a',t:'Pensando…',pending:true,acts:[]});render();
@@ -936,7 +939,22 @@ function vGrupos(){
 /* ---------- ocio y plan de ahorro recomendado ---------- */
 var OCIO_F={normal:.25,sos:0};
 var ESS_SPLIT={fuera:.4,ocio:.3,compras:.3};
-function objDef(id){return PLANES.filter(function(p){return p.id===id;})[0]||null;}
+/* Los planes ahora son una lista que diseña el usuario. Se migra una vez el objetivo antiguo (si lo había) */
+function nomPlan(q){return q.nombre||'Plan sin nombre';}
+function ensurePlanes(){
+  if(S.planesInit||!S.profile)return;S.planesInit=true;
+  var p=S.profile,od=PLANES.filter(function(x){return x.id===p.objetivo;})[0],ah=Math.round(+p.ahorro||0);
+  if(!S.misPlanes.length){
+    var old=S.plans&&S.plans.mi;
+    if(old&&(+old.target>0))S.misPlanes.push({id:uid(),nombre:old.nombre||'',target:+old.target,saved:+old.saved||0,months:+old.months||12,aporte:ah});
+    else if(od){var st=(S.plans&&S.plans[od.id])||{};S.misPlanes.push({id:uid(),nombre:od.t,target:+st.target||od.def(),saved:+st.saved||0,months:+st.months||+p.plazo||12,aporte:ah});}
+  }
+  save();
+}
+function objDef(id){
+  if(id==='mi'){var q=S.plans&&S.plans.mi;return q?{id:'mi',t:q.nombre||'Mi objetivo',def:function(){return +q.target||0;},bd:function(){return [[q.nombre||'Mi objetivo',+q.target||0]];},steps:[]}:null;}
+  return PLANES.filter(function(p){return p.id===id;})[0]||null;
+}
 function ocioInfo(m){
   var tot=Math.max(0,m.budget)*(OCIO_F[S.mode]||0);
   var sp=m.mg.filter(function(g){return CATS[g.cat]&&!CATS[g.cat].e;}).reduce(function(a,g){return a+g.importe;},0);
@@ -961,37 +979,61 @@ function ocioHtml(m){
     (later.length?'<p class="hint">Cuando te sobre más margen:</p><ul class="list">'+later.map(function(x){return li(x,true);}).join('')+'</ul>':'')+'</section>';
 }
 function advice(){
+  ensurePlanes();
   var p=S.profile,m=model(),libre=m.libre,floor=floorBasicos();
-  var od=objDef(p.objetivo),months=Math.max(1,+p.plazo||12),st=od?S.plans[od.id]:null;
-  var target=od?(st&&st.target?st.target:od.def()):0,saved=st?(st.saved||0):0,left=Math.max(0,target-saved);
+  var items=S.misPlanes.filter(function(q){return (+q.target||0)>0;}).map(function(q){var left=Math.max(0,q.target-(q.saved||0)),mo=Math.max(1,+q.months||12);return {q:q,left:left,months:mo,need:left>0?left/mo:0};});
+  var has=items.length>0,left=items.reduce(function(a,x){return a+x.left;},0);
   var f=m.day>=7?m.n/m.day:1,sp={},tot=0,have=false;
   m.mg.forEach(function(g){if(CATS[g.cat]&&!CATS[g.cat].e){sp[g.cat]=(sp[g.cat]||0)+g.importe;have=true;}});
   Object.keys(sp).forEach(function(k){sp[k]*=f;tot+=sp[k];});
   var est=false;
   if(!have){est=true;tot=Math.max(0,(libre-floor)*0.35);sp={};Object.keys(ESS_SPLIT).forEach(function(k){sp[k]=tot*ESS_SPLIT[k];});}
   var cap=Math.max(0,libre-floor-tot);
-  /* todo lo que se podría recortar como mucho */
+  /* pagos que se pueden quitar o recortar, de menos a más importantes: primero suscripciones, luego gastos del día a día */
   var pot=[];
-  [['compras',.6],['fuera',.4],['ocio',.3],['otros',.5]].forEach(function(c){if(sp[c[0]]&&sp[c[0]]*c[1]>=1)pot.push({l:CATS[c[0]].l,from:sp[c[0]],max:sp[c[0]]*c[1]});});
   var subs=(p.subs||[]).slice().sort(function(a,b){return b.imp-a.imp;});
-  if(subs.length){var sv=subs.slice(0,2),sm=sv.reduce(function(a,s){return a+(+s.imp||0);},0);if(sm>=1)pot.push({l:'Pausar '+sv.map(function(s){return s.n;}).join(' y '),from:sm,max:sm});}
+  subs.forEach(function(sb){if((+sb.imp||0)>=0.5)pot.push({l:'Pausar '+sb.n,from:+sb.imp,max:+sb.imp,sub:sb.id,whole:true});});
+  [['compras',.6],['fuera',.4],['ocio',.3],['otros',.5]].forEach(function(c){if(sp[c[0]]&&sp[c[0]]*c[1]>=1)pot.push({l:CATS[c[0]].l,from:sp[c[0]],max:sp[c[0]]*c[1]});});
   var potTot=pot.reduce(function(a,c){return a+c.max;},0),maxCap=cap+potTot;
-  var need=od?(left>0?left/months:0):Math.max(0,(libre-floor)*0.2);
+  var need=has?items.reduce(function(a,x){return a+x.need;},0):Math.max(0,(libre-floor)*0.2);
   var def=Math.max(0,need-cap),got=0,cuts=[];
-  pot.forEach(function(c){if(def-got<=0.5)return;var take=Math.min(c.max,def-got);if(take<1)return;cuts.push({l:c.l,from:c.from,cut:take});got+=take;});
+  pot.forEach(function(c){if(def-got<=0.5)return;var take=c.whole?c.max:Math.min(c.max,def-got);if(take<1)return;cuts.push({l:c.l,from:c.from,cut:take,sub:c.sub});got+=take;});
   var covered=maxCap>=need-0.5;
   var monthly=Math.max(0,Math.ceil(Math.min(need,maxCap)));
-  var real=(od&&left>0)?(monthly>0?Math.ceil(left/monthly):Infinity):null;
-  return {od:od,target:target,saved:saved,left:left,months:months,need:need,cap:cap,maxCap:maxCap,falta:Math.max(0,need-maxCap),cuts:cuts,got:got,monthly:monthly,covered:covered,real:real,libre:libre,floor:floor,tot:tot,est:est,sinMargen:libre-floor<=0,carry:m.carry};
+  var ratio=need>0?Math.min(1,monthly/need):1;
+  items.forEach(function(it){it.share=it.left>0?Math.ceil(it.need*ratio):0;it.real=it.left>0?(it.share>0?Math.ceil(it.left/it.share):Infinity):0;it.ok=it.left<=0||it.real<=it.months;});
+  if(has)monthly=items.reduce(function(a,x){return a+x.share;},0);
+  return {plans:items,has:has,left:left,need:need,cap:cap,maxCap:maxCap,falta:Math.max(0,need-maxCap),cuts:cuts,got:got,monthly:monthly,covered:covered,libre:libre,floor:floor,tot:tot,est:est,sinMargen:libre-floor<=0,carry:m.carry};
 }
 function planMiniHtml(){
   var a=advice(),txt,cls='ok';
+  if(!a.has)return '<section class="panel"><h2>Tus planes de ahorro<a class="hint" href="#planes">Diseñar</a></h2><p>Todavía no has diseñado ningún plan. Dinos cuánto quieres ahorrar y en cuánto tiempo y te decimos cuánto apartar al mes.</p><div class="row"><a class="btn primary sm" href="#planes">Diseñar mi plan</a></div></section>';
+  var names=a.plans.filter(function(x){return x.left>0;}).map(function(x){return nomPlan(x.q);});
   if(a.sinMargen){txt='Ahora mismo no te queda margen para ahorrar.';cls='bad';}
-  else if(a.od&&a.left<=0){txt='Meta conseguida. ¡Enhorabuena!';}
-  else if(a.od&&!a.covered){cls='bad';txt='Para '+a.od.t.toLowerCase()+' ('+eur(a.target)+') en '+fmtMeses(a.months)+' necesitas '+eur(a.need)+' al mes, pero como mucho puedes apartar '+eur(a.monthly)+'. A ese ritmo llegas en '+fmtMeses(a.real)+'.';}
-  else{txt='Aparta '+eur(a.monthly)+' al mes'+(a.od?' para '+a.od.t.toLowerCase()+' ('+eur(a.left)+' que te faltan)':'')+(a.cuts.length?' y recorta '+eur(a.got)+' de gastos prescindibles':'')+'.';if(a.cuts.length)cls='warn';}
+  else if(a.left<=0){txt='Metas conseguidas. ¡Enhorabuena!';}
+  else if(!a.covered){cls='bad';txt='Para '+names.join(', ')+' necesitas '+eur(a.need)+' al mes, pero como mucho puedes apartar '+eur(a.monthly)+'. Algún plan llegará más tarde de lo previsto.';}
+  else{txt='Aparta '+eur(a.monthly)+' al mes para '+names.join(', ')+' ('+eur(a.left)+' que te faltan en total)'+(a.cuts.length?' y recorta '+eur(a.got)+' de gastos prescindibles':'')+'.';if(a.cuts.length)cls='warn';}
   var applied=a.monthly>0&&Math.round(+S.profile.ahorro||0)===a.monthly;
-  return '<section class="panel"><h2>Tu plan de ahorro<a class="hint" href="#planes">Ver plan</a></h2><p>'+esc(txt)+'</p><div class="row"><span class="pill '+cls+'">'+(a.sinMargen?'Sin margen':!a.covered?'No llegas en ese plazo':a.cuts.length?'Ajustado':'Te sale')+'</span>'+(applied?'<span class="pill ok">Aplicado</span>':'')+'</div></section>';
+  return '<section class="panel"><h2>'+(a.plans.length>1?'Tus planes de ahorro':'Tu plan de ahorro')+'<a class="hint" href="#planes">Ver planes</a></h2><p>'+esc(txt)+'</p><div class="row"><span class="pill '+cls+'">'+(a.sinMargen?'Sin margen':!a.covered?'No llegas en ese plazo':a.cuts.length?'Ajustado':'Te sale')+'</span>'+(applied?'<span class="pill ok">Aplicado</span>':'')+'</div></section>';
+}
+/* cuánto hay que apartar al mes, bien visible */
+function planStrip(a){
+  if(!a.has||a.left<=0)return '';
+  var last=a.plans.reduce(function(x,it){var v=it.left<=0?0:(it.ok?it.months:it.real);return Math.max(x,v);},0);
+  return '<div class="plan-strip"><div><span class="hint">Aparta cada mes</span><strong class="num">'+eur(a.monthly)+'</strong></div><div><span class="hint">Te faltan en total</span><strong class="num">'+eur(a.left)+'</strong></div><div><span class="hint">Todo listo en</span><strong class="num">'+esc(fmtMeses(last))+'</strong></div></div>';
+}
+/* así quedaría (o así está) tu Inicio al aplicar el plan */
+function previewHtml(a){
+  if(a.sinMargen||!(a.monthly>0))return '';
+  var m=model(),pausar=a.cuts.filter(function(c){return c.sub;}).reduce(function(x,c){return x+c.cut;},0);
+  var base2=Math.max(0,m.ingresos-(m.fijos-pausar)-a.monthly),bud2=base2+m.carry+m.extra,left2=(bud2-(m.spent-m.spentToday))/m.daysLeft-m.spentToday;
+  var applied=Math.round(+S.profile.ahorro||0)===a.monthly;
+  var row=function(l,now,aft){return '<li><span>'+esc(l)+'</span><span class="num">'+(applied?eur(aft,2):eur(now,2)+' → <strong>'+eur(aft,2)+'</strong>')+'</span></li>';};
+  return '<h3>'+(applied?'Así está tu Inicio con tus planes':'Así quedaría tu Inicio al aplicar los planes')+'</h3><ul class="list">'+row('Ahorro al mes (aparece en el pie)',m.ahorro,a.monthly)+row('Presupuesto del mes (ticket)',m.budget,bud2)+row('Hoy puedes gastar (ticket)',m.leftToday,left2)+'</ul>';
+}
+function pausedHtml(){
+  var L=S.subsPausa||[];if(!L.length)return '';
+  return '<section class="panel"><h2>Suscripciones pausadas<span class="hint num">'+eur(subsSum(L),2)+' al mes liberados</span></h2><ul class="list">'+L.map(function(x){return '<li><span class="l">'+esc(x.n)+'<small>'+eur(x.imp,2)+' al mes</small></span><button class="btn sm" data-act="subResume" data-id="'+x.id+'">Reactivar</button></li>';}).join('')+'</ul><p class="hint">Al reactivar una, vuelve a sumarse a tus gastos fijos y tus planes se recalculan.</p></section>';
 }
 function bdHtml(od,target){
   var L=od.bd(),sum=L.reduce(function(a,x){return a+x[1];},0);
@@ -999,24 +1041,28 @@ function bdHtml(od,target){
 }
 function adviceHtml(){
   var a=advice(),m=model(),p=S.profile;
-  var plz=fmtMeses(a.months);
-  var goal=a.od?a.od.t+' · '+eur(a.target)+' en '+plz:'Ahorrar sin una meta concreta';
-  var cls,title,detail;
+  if(!a.has)return '<section class="panel"><h2>Tu plan de ahorro recomendado</h2><p class="hint">Rellena tu primer plan a la izquierda: con el importe y el plazo te diré cuánto apartar cada mes y qué pagos puedes quitar.</p></section>';
+  var n=a.plans.length,cls,title,detail;
   if(a.sinMargen){cls='bad';title='Ahora mismo no queda margen para ahorrar';detail='Con '+eur(m.ingresos)+' de ingresos y '+eur(m.fijos)+' de gastos fijos, casi no queda nada para comer y vivir. Antes de ahorrar, mira las ayudas que te corresponden o si algún gasto fijo se puede reducir.';}
-  else if(a.od&&a.left<=0){cls='ok';title='Meta conseguida';detail='Ya tienes ahorrado lo que necesitas para este objetivo.';}
-  else if(a.covered&&!a.cuts.length){cls='ok';title='Puedes lograrlo sin recortar';detail='Te faltan '+eur(a.left)+'. Aparta '+eur(a.monthly)+' al mes'+(a.od?' y llegas en '+plz+' ('+fechaEn(a.months)+').':'.');}
-  else if(a.covered){cls='warn';title='Lo logras recortando';detail='Te faltan '+eur(a.left)+': son '+eur(a.monthly)+' al mes durante '+plz+'. Tu margen actual es de '+eur(a.cap)+', así que tienes que recortar unos '+eur(a.got)+' al mes.';}
-  else{cls='bad';title='En '+plz+' no llegas';detail='Te faltan '+eur(a.left)+', así que necesitarías '+eur(a.need)+' al mes. Aunque recortes todo lo prescindible, como mucho puedes apartar '+eur(a.monthly)+' al mes (te faltan '+eur(a.falta)+' al mes). A ese ritmo llegarías en '+fmtMeses(a.real)+(isFinite(a.real)?' ('+fechaEn(a.real)+')':'')+'. Opciones: alarga el plazo, sube tus ingresos o mira las ayudas.';}
+  else if(a.left<=0){cls='ok';title=n>1?'Metas conseguidas':'Meta conseguida';detail='Ya tienes ahorrado lo que necesitas.';}
+  else if(a.covered&&!a.cuts.length){cls='ok';title='Puedes lograrlo sin recortar';detail='Te faltan '+eur(a.left)+(n>1?' entre tus '+n+' planes':'')+'. Aparta '+eur(a.monthly)+' al mes y llegas a cada meta en su plazo.';}
+  else if(a.covered){cls='warn';title='Lo logras quitando algunos pagos';detail='Te faltan '+eur(a.left)+(n>1?' entre tus '+n+' planes':'')+': son '+eur(a.monthly)+' al mes. Tu margen actual es de '+eur(a.cap)+', así que tienes que quitar o recortar unos '+eur(a.got)+' al mes.';}
+  else{cls='bad';title=n>1?'Con esos plazos no llegas a todo':'En ese plazo no llegas';detail='Necesitarías '+eur(a.need)+' al mes y, aunque quites todo lo prescindible, como mucho puedes apartar '+eur(a.monthly)+' (te faltan '+eur(a.falta)+' al mes). He repartido ese dinero entre tus planes. Opciones: alarga algún plazo, quita algún plan, sube tus ingresos o mira las ayudas.';}
   var rows=[['Ingresos al mes',eur(m.ingresos)],['− Gastos fijos',eur(m.fijos)],['− Comida y básicos (estimación)',eur(a.floor)],['− Ocio y caprichos'+(a.est?' (estimación)':' (proyección del mes)'),eur(a.tot)],['= Margen para ahorrar',eur(a.cap)],['Máximo recortando lo prescindible',eur(a.maxCap)]];
   var tbl='<ul class="list">'+rows.map(function(r){return '<li><span>'+esc(r[0])+'</span><span class="num">'+r[1]+'</span></li>';}).join('')+'</ul>';
-  var cuts=a.cuts.length?'<h3>Dónde recortar</h3><ul class="list">'+a.cuts.map(function(c){return '<li><span class="l">'+esc(c.l)+'<small>Ahora unos '+eur(c.from)+' al mes</small></span><span class="pill warn num">− '+eur(c.cut)+'</span></li>';}).join('')+'</ul>':'';
-  var meta=a.od?'<details open><summary class="hint">De dónde sale la meta de '+eur(a.target)+'</summary>'+bdHtml(a.od,a.target)+(a.saved?'<p class="hint">Ya llevas ahorrado <strong class="num">'+eur(a.saved)+'</strong>. Te faltan <strong class="num">'+eur(a.left)+'</strong>.</p>':'')+'</details>':'';
-  var carry=(a.carry>0&&a.od&&a.left>0)?'<div class="row"><span class="hint">Te sobraron <strong class="num">'+eur(a.carry,2)+'</strong> de meses anteriores (ahora suman a tu presupuesto de este mes).</span><button class="btn sm" data-act="carryToPlan">Pasarlos a mi meta</button></div>':'';
+  var plans='<h3>Cuánto apartar para cada plan</h3><ul class="list">'+a.plans.map(function(it){
+    var st=it.left<=0?'<span class="pill ok">Conseguido</span>':'<span class="pill '+(it.ok?'ok':'warn')+' num">'+eur(it.share)+' al mes</span>';
+    var sm=it.left<=0?'Ya tienes los '+eur(it.q.target):'Te faltan '+eur(it.left)+' · plazo '+fmtMeses(it.months)+(it.ok?' (hasta '+fechaEn(it.months)+')':' · a este ritmo, '+fmtMeses(it.real)+(isFinite(it.real)?' ('+fechaEn(it.real)+')':''));
+    return '<li><span class="l">'+esc(nomPlan(it.q))+'<small>'+esc(sm)+'</small></span>'+st+'</li>';}).join('')+'</ul>';
+  var cuts=a.cuts.length?'<h3>Pagos que te recomendamos quitar o recortar</h3><p class="hint">Ordenados de menos a más importantes. Al aplicar los planes se pausan las suscripciones (puedes reactivarlas cuando quieras); en el resto, recorta ese importe cada mes.</p><ul class="list">'+a.cuts.map(function(c){return '<li><span class="l">'+esc(c.l)+'<small>'+(c.sub?'Suscripción · ':'Ahora unos ')+eur(c.from,c.sub?2:0)+' al mes</small></span><span class="pill warn num">'+(c.sub?'Quitar · ':'− ')+eur(c.cut,c.sub?2:0)+'</span></li>';}).join('')+'</ul>':'';
+  var first=a.plans.filter(function(it){return it.left>0;})[0];
+  var carry=(a.carry>0&&first)?'<div class="row"><span class="hint">Te sobraron <strong class="num">'+eur(a.carry,2)+'</strong> de meses anteriores (ahora suman a tu presupuesto de este mes).</span><button class="btn sm" data-act="carryToPlan">Pasarlos a «'+esc(nomPlan(first.q))+'»</button></div>':'';
   var applied=a.monthly>0&&Math.round(+p.ahorro||0)===a.monthly;
-  var act=a.sinMargen?'<a class="btn primary" href="#ayudas">Ver ayudas para mí</a>':(applied?'<span class="pill ok">Plan aplicado: apartas '+eur(a.monthly)+' al mes</span>':'<button class="btn primary" data-act="applyPlan"'+(a.monthly>0?'':' disabled')+'>Aplicar este plan ('+eur(a.monthly)+' al mes)</button>');
-  return '<section class="panel"><h2>Tu plan de ahorro recomendado<span class="hint">'+esc(goal)+'</span></h2><div class="verdict '+cls+'"><h2>'+esc(title)+'</h2><p>'+esc(detail)+'</p></div>'+meta+tbl+cuts+carry+
+  var nSub=a.cuts.filter(function(c){return c.sub;}).length;
+  var act=a.sinMargen?'<a class="btn primary" href="#ayudas">Ver ayudas para mí</a>':(applied?'<span class="pill ok">Planes aplicados: apartas '+eur(a.monthly)+' al mes</span>':'<button class="btn primary" data-act="applyPlan"'+(a.monthly>0?'':' disabled')+'>Aplicar '+(n>1?'estos planes':'este plan')+' ('+eur(a.monthly)+' al mes'+(nSub?' y pausar '+nSub+(nSub===1?' suscripción':' suscripciones'):'')+')</button>');
+  return '<section class="panel"><h2>Tu plan de ahorro recomendado<span class="hint">'+n+(n===1?' plan':' planes')+'</span></h2><div class="verdict '+cls+'"><h2>'+esc(title)+'</h2><p>'+esc(detail)+'</p></div>'+(a.sinMargen?'':planStrip(a)+plans)+tbl+cuts+carry+previewHtml(a)+
     (a.est?'<p class="hint">Aún no has apuntado gastos de ocio este mes, así que he estimado cuánto gastas. Apúntalos en Inicio y afinaré los recortes.</p>':'')+
-    '<div class="row">'+act+'</div><p class="hint">Son cálculos orientativos: damos por hecho '+eur(a.floor)+' al mes de comida y básicos'+(p.vivienda==='familia'?' (vives con tu familia)':'')+'. Al aplicar el plan, tu presupuesto diario se ajusta para apartar ese ahorro y, al cerrar cada mes, se suma a tu meta.</p></section>';
+    '<div class="row">'+act+'</div><p class="hint">Son cálculos orientativos: damos por hecho '+eur(a.floor)+' al mes de comida y básicos'+(p.vivienda==='familia'?' (vives con tu familia)':'')+'. Al aplicar, tu presupuesto diario se ajusta para apartar ese ahorro y, al cerrar cada mes, se reparte entre tus planes.</p></section>';
 }
 
 
@@ -1031,7 +1077,7 @@ function ticketHtml(m){
   var line=m.budget<=0?'Tus gastos fijos y tu ahorro ya se llevan todos tus ingresos.':diff>=0?'Vas '+eur(diff,2)+' por debajo del ritmo ideal.':'Llevas '+eur(-diff,2)+' por encima del ritmo ideal.';
   return '<section class="ticket" aria-label="Resumen de hoy">'+
   '<div class="tk-head"><span>Ticket de hoy</span><span>'+esc(d.toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'long'}))+'</span></div>'+
-  '<dl class="tk-lines">'+((m.carry>0||m.extra>0)?'<div><dt>Presupuesto de este mes</dt><dd>'+eur(m.base)+'</dd></div>'+(m.extra>0?'<div><dt>+ Ingresos extra de este mes</dt><dd>'+eur(m.extra,2)+'</dd></div>':'')+(m.carry>0?'<div><dt>+ Te sobró de meses anteriores</dt><dd>'+eur(m.carry,2)+'</dd></div>':''):'')+'<div><dt>'+((m.carry>0||m.extra>0)?'= Total disponible':'Presupuesto del mes')+'</dt><dd>'+eur(m.budget,(m.carry>0||m.extra>0)?2:0)+'</dd></div><div><dt>Gastado hasta hoy</dt><dd>− '+eur(m.spent,2)+'</dd></div><div><dt>Te quedan</dt><dd>'+eur(m.remaining,2)+'</dd></div><div><dt>Días por delante, hoy incluido</dt><dd>÷ '+m.daysLeft+'</dd></div></dl>'+
+  '<dl class="tk-lines"><div><dt>Ingresos del mes</dt><dd>'+eur(m.ingresos)+'</dd></div><div><dt>− Gastos fijos</dt><dd>'+eur(m.fijos,2)+'</dd></div>'+(m.ahorro>0?'<div><dt>− Ahorro de tus planes</dt><dd>'+eur(m.ahorro)+'</dd></div>':'')+'<div><dt>= Presupuesto del mes</dt><dd>'+eur(m.base,2)+'</dd></div>'+(m.extra>0?'<div><dt>+ Ingresos extra de este mes</dt><dd>'+eur(m.extra,2)+'</dd></div>':'')+(m.carry>0?'<div><dt>+ Te sobró de meses anteriores</dt><dd>'+eur(m.carry,2)+'</dd></div>':'')+((m.carry>0||m.extra>0)?'<div><dt>= Total disponible</dt><dd>'+eur(m.budget,2)+'</dd></div>':'')+'<div><dt>Gastado hasta hoy</dt><dd>− '+eur(m.spent,2)+'</dd></div><div><dt>Te quedan</dt><dd>'+eur(m.remaining,2)+'</dd></div><div><dt>Días por delante, hoy incluido</dt><dd>÷ '+m.daysLeft+'</dd></div></dl>'+
   '<div class="tk-total"><span>Hoy puedes gastar</span><strong class="hl num">'+eur(m.leftToday,2)+'</strong></div>'+
   '<div class="tk-foot">'+statusPill(m)+'<span>'+esc(line)+'</span></div></section>';
 }
@@ -1093,11 +1139,11 @@ function catsHtml(m){
   Object.keys(p.gastos||{}).forEach(function(k){var v=+p.gastos[k]||0;if(v>0)sl.push({l:FL[k]||k,v:v});});
   var by={};m.mg.forEach(function(g){by[g.cat]=(by[g.cat]||0)+g.importe;});
   Object.keys(CATS).forEach(function(k){if(by[k])sl.push({l:CATS[k].l,v:by[k],k:k});});
-  if(m.ahorro>0)sl.push({l:'Ahorro',v:m.ahorro});
+  if(m.ahorro>0){var pn=S.misPlanes.filter(function(q){return q.aporte>0;});sl.push({l:'Ahorro'+(pn.length===1?' · '+nomPlan(pn[0]):pn.length>1?' · '+pn.length+' planes':''),v:m.ahorro});}
   var tot=sl.reduce(function(a,x){return a+x.v;},0);
   if(!tot)return '<section class="panel"><h2>El pie de tu mes</h2><p class="hint">Cuando apuntes gastos verás aquí cómo se reparte tu dinero.</p></section>';
   var acc=0,stops=sl.map(function(x,i){var a=acc/tot*360;acc+=x.v;return PIEC[i%PIEC.length]+' '+a.toFixed(1)+'deg '+(acc/tot*360).toFixed(1)+'deg';}).join(',');
-  return '<section class="panel"><h2>El pie de tu mes<span class="hint">'+MESES[m.mo]+'</span></h2><div class="pie-w"><div class="pie" role="img" aria-label="Gráfico circular con el reparto de tu mes" style="background:conic-gradient('+stops+')"><span class="pie-c"><strong class="num">'+eur(tot)+'</strong><small>en total</small></span></div><ul class="leg">'+sl.map(function(x,i){var frz=x.k&&lvl()>=3&&!CATS[x.k].e;return '<li><i style="background:'+PIEC[i%PIEC.length]+'"></i><span>'+esc(x.l)+(frz?' <span class="pill bad">Congelado</span>':'')+'</span><span class="num">'+Math.round(x.v/tot*100)+' %</span><span class="num">'+eur(x.v,2)+'</span></li>';}).join('')+'</ul></div><p class="hint">Gastos fijos, lo que llevas gastado este mes y tu ahorro.</p></section>';
+  return '<section class="panel"><h2>El pie de tu mes<span class="hint">'+MESES[m.mo]+'</span></h2><div class="pie-w"><div class="pie" role="img" aria-label="Gráfico circular con el reparto de tu mes" style="background:conic-gradient('+stops+')"><span class="pie-c"><strong class="num">'+eur(tot)+'</strong><small>en total</small></span></div><ul class="leg">'+sl.map(function(x,i){var frz=x.k&&lvl()>=3&&!CATS[x.k].e;return '<li><i style="background:'+PIEC[i%PIEC.length]+'"></i><span>'+esc(x.l)+(frz?' <span class="pill bad">Congelado</span>':'')+'</span><span class="num">'+Math.round(x.v/tot*100)+' %</span><span class="num">'+eur(x.v,2)+'</span></li>';}).join('')+'</ul></div><p class="hint">Gastos fijos, lo que llevas gastado este mes y el ahorro de tus planes.</p></section>';
 }
 function cardPanel(){
   var b=S.card.blocked;
@@ -1298,22 +1344,19 @@ function planInfo(def){
   return {on:!!(st&&st.on),target:target,monthly:monthly,saved:saved,left:left,months:months,pct:target?Math.min(100,Math.round(saved/target*100)):0};
 }
 function vPlanes(){
-  var rec=PLAN_REC[S.mode]||[],adv=advice(),maxCap=Math.floor(adv.maxCap);
-  return '<div><h1>Planes de ahorro</h1><p class="sub">Cada meta está calculada con costes reales desglosados. Elige el plazo y te decimos cuánto tienes que apartar al mes y si te da con tu margen. Este contenido es informativo, no asesoramiento financiero.</p></div>'+adviceHtml()+
-  '<div class="grid">'+PLANES.map(function(d){
-    var i=planInfo(d),when='',cls='ok';
-    if(i.left<=0)when='Meta conseguida';
-    else if(i.monthly<=maxCap)when='Necesitas '+eur(i.monthly)+' al mes durante '+fmtMeses(i.months)+' (hasta '+fechaEn(i.months)+'). Te da con tu margen.';
-    else{cls='bad';var r=maxCap>0?Math.ceil(i.left/maxCap):Infinity;when='Necesitas '+eur(i.monthly)+' al mes, pero como mucho puedes apartar '+eur(maxCap)+'. Con eso tardarías '+fmtMeses(r)+'.';}
-    var plz='<label class="f"><span>Plazo</span><select data-plan="'+d.id+'" data-k="months">'+PLAZOS.map(function(o){return '<option value="'+o[0]+'"'+(o[0]===i.months?' selected':'')+'>'+o[1]+'</option>';}).join('')+'</select></label>';
-    var pr=d.precio?'<label class="f"><span>Precio del piso (€)</span><input type="number" min="10000" step="1000" data-plan="'+d.id+'" data-k="precio" value="'+precioViv()+'"></label>':'';
-    return '<article class="panel plan'+(i.on?' on':'')+'"><div class="row">'+(rec.indexOf(d.id)>=0?'<span class="pill ok">Recomendado en modo '+MODES[S.mode].l+'</span>':'')+(i.on?'<span class="pill warn">Activo</span>':'')+'</div><h3>'+esc(d.t)+'</h3><p class="sc-d">'+esc(d.d)+'</p>'+
-    '<div class="form-g">'+pr+'<label class="f"><span>Meta (€)</span><input id="pl-t-'+d.id+'" type="number" min="0" step="10" data-plan="'+d.id+'" data-k="target" value="'+i.target+'"></label>'+plz+'</div>'+
-    '<details><summary class="hint">De dónde sale la meta</summary>'+bdHtml(d,i.target)+(d.precio?'<p class="hint">Precio orientativo de un piso de unos 70 m² en '+esc(S.profile.ccaa||'tu comunidad')+'. Cámbialo por el del piso que buscas.</p>':'')+'</details>'+
-    '<div class="meter" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="'+i.pct+'" aria-label="Progreso del plan"><i style="width:'+i.pct+'%"></i></div><p class="hint num">'+eur(i.saved)+' de '+eur(i.target)+'</p><p class="'+(cls==='bad'?'err':'hint')+'">'+esc(when)+'</p>'+
-    (i.on?'<div class="row"><button class="btn sm" data-act="aporta" data-id="'+d.id+'" data-v="10">+10 €</button><button class="btn sm" data-act="aporta" data-id="'+d.id+'" data-v="25">+25 €</button><button class="btn sm" data-act="aporta" data-id="'+d.id+'" data-v="50">+50 €</button><button class="btn sm ghost" data-act="planOff" data-id="'+d.id+'">Quitar</button></div>':'<button class="btn primary sm" data-act="planOn" data-id="'+d.id+'">Activar plan</button>')+
-    '<details><summary class="hint">Pasos</summary><ol>'+d.steps.map(function(x){return '<li>'+esc(x)+'</li>';}).join('')+'</ol></details></article>';
-  }).join('')+'</div>';
+  ensurePlanes();
+  var cards=S.misPlanes.map(function(q,i){
+    var ap=[10,25,50,100].map(function(v){return '<button type="button" class="btn sm" data-act="aporta" data-id="'+q.id+'" data-v="'+v+'">+'+v+' €</button>';}).join('');
+    return '<article class="panel"><div class="row"><strong>Plan '+(i+1)+'</strong><button type="button" class="btn sm ghost danger" data-act="miDel" data-id="'+q.id+'">Eliminar</button></div>'+
+    '<label class="f"><span>¿Para qué quieres ahorrar?</span><input data-mi="nombre" data-pid="'+q.id+'" maxlength="40" value="'+esc(q.nombre)+'" placeholder="Viaje, portátil, entrada del piso..."></label>'+
+    '<div class="form-g"><label class="f"><span>¿Cuánto quieres ahorrar? (€)</span><input type="number" min="0" step="10" inputmode="decimal" data-mi="target" data-pid="'+q.id+'" value="'+(q.target?q.target:'')+'" placeholder="1500"></label>'+
+    '<label class="f"><span>¿Cuánto llevas ya? (€)</span><input type="number" min="0" step="10" inputmode="decimal" data-mi="saved" data-pid="'+q.id+'" value="'+(q.saved||0)+'"></label>'+
+    '<label class="f"><span>¿En cuántos meses?</span><input type="number" min="1" max="240" step="1" data-mi="months" data-pid="'+q.id+'" value="'+q.months+'"></label></div>'+
+    '<div class="row"><span class="hint">Añadir lo que vayas ahorrando:</span>'+ap+'</div></article>';
+  }).join('');
+  return '<div><h1>Diseña tus planes de ahorro</h1><p class="sub">Crea tantos planes como quieras: dinos qué quieres conseguir, cuánto cuesta y en cuánto tiempo. Te decimos cuánto apartar cada mes y, si tu margen no llega, qué pagos poco importantes puedes quitar. Este contenido es informativo, no asesoramiento financiero.</p></div>'+
+  '<div class="cols"><div class="col">'+cards+'<button type="button" class="btn primary" data-act="miAdd">+ Añadir otro plan</button><p class="hint">Los planes se guardan solos según escribes. Para que cuenten en tu presupuesto, pulsa «Aplicar» a la derecha.</p>'+pausedHtml()+'</div>'+
+  '<div class="col" id="mi-out">'+adviceHtml()+'</div></div>';
 }
 
 /* asistente */
@@ -1430,7 +1473,7 @@ var ACT={
   },
   askNotif:function(){try{Notification.requestPermission().then(function(r){render();if(r==='granted'){toast('Notificaciones activadas','ok');sysNotify('STUD€NTIA','Te avisaremos cuando te quede el 50 %, 20 %, 10 % y 5 % del presupuesto.');}});}catch(e){toast('Tu navegador no permite notificaciones','bad');}},
   subDel:function(el){var p=S.profile;p.subs=p.subs.filter(function(s){return s.id!==el.dataset.id;});p.gastos.suscripciones=subsSum(p.subs);save();render();toast('Suscripción quitada','ok');},
-  carryToPlan:function(){var a=advice();if(!a.od||a.carry<=0)return;var keys=Object.keys(S.closed).filter(function(k){return k<curMes();}).sort(),k=keys[keys.length-1];var amt=Math.min(a.carry,a.left);S.closed[k].out=Math.round((S.closed[k].out-amt)*100)/100;var cur=S.plans[a.od.id]||{target:a.target,months:a.months,saved:0};cur.on=true;cur.saved=(cur.saved||0)+amt;S.plans[a.od.id]=cur;save();render();toast(eur(amt,2)+' pasados a '+a.od.t.toLowerCase(),'ok');},
+  carryToPlan:function(){var a=advice(),f=a.plans.filter(function(it){return it.left>0;})[0];if(!f||a.carry<=0)return;var keys=Object.keys(S.closed).filter(function(k){return k<curMes();}).sort(),k=keys[keys.length-1];var amt=Math.min(a.carry,f.left);S.closed[k].out=Math.round((S.closed[k].out-amt)*100)/100;f.q.saved=(f.q.saved||0)+amt;save();render();toast(eur(amt,2)+' pasados a '+nomPlan(f.q).toLowerCase(),'ok');},
   subAddD:function(){D.subs.push({id:uid(),n:'',imp:'',dia:1});render();},
   subDelD:function(el){D.subs=D.subs.filter(function(s){return s.id!==el.dataset.id;});render();},
   sos:function(){openSOS();},
@@ -1469,10 +1512,12 @@ var ACT={
   leave:function(el){delete S.joined[el.dataset.id];save();render();},
   checkin:function(el){var j=S.joined[el.dataset.id],k=ymd(new Date());if(j.checks.indexOf(k)<0)j.checks.push(k);save();var s=retoStats(el.dataset.id);render();toast(s.done?'Reto superado. +50 puntos':'Racha de '+s.streak+(s.streak===1?' día':' días'),'ok');},
   copyInvite:function(el){copy(el.dataset.t,'Invitación copiada');},
-  simPlan:function(){var d=objDef('piso'),cur=S.plans.piso||{};S.plans.piso={on:true,target:d.def(),months:cur.months||12,saved:cur.saved||0};save();location.hash='#planes';toast('Plan para independizarte activado','ok');},
+  simPlan:function(){var d=objDef('piso'),nm='Independizarme de alquiler',q=S.misPlanes.filter(function(x){return x.nombre===nm;})[0];if(!q){q={id:uid(),nombre:nm,target:0,saved:0,months:12,aporte:0};S.misPlanes.push(q);}q.target=d.def();save();location.hash='#planes';toast('Plan para independizarte creado: ajústalo a tu gusto','ok');},
   planOn:function(el){var d=PLANES.filter(function(p){return p.id===el.dataset.id;})[0],i=planInfo(d),cur=S.plans[d.id]||{};S.plans[d.id]=Object.assign(cur,{on:true,target:i.target,months:i.months,saved:i.saved});save();render();toast('Plan activado: '+eur(i.monthly)+' al mes','ok');},
   planOff:function(el){S.plans[el.dataset.id].on=false;save();render();},
-  aporta:function(el){var p=S.plans[el.dataset.id];p.saved+=+el.dataset.v;save();render();toast('Aportación apuntada','ok');},
+  aporta:function(el){var q=S.misPlanes.filter(function(x){return x.id===el.dataset.id;})[0];if(!q)return;q.saved=(q.saved||0)+(+el.dataset.v);save();render();toast('Aportación apuntada','ok');},
+  miAdd:function(){S.misPlanes.push({id:uid(),nombre:'',target:0,saved:0,months:12,aporte:0});save();render();var ins=document.querySelectorAll('[data-mi="nombre"]');if(ins.length)ins[ins.length-1].focus();},
+  miDel:function(el){var q=S.misPlanes.filter(function(x){return x.id===el.dataset.id;})[0];if(!q)return;S.misPlanes=S.misPlanes.filter(function(x){return x.id!==q.id;});S.profile.ahorro=Math.max(0,Math.round((+S.profile.ahorro||0)-(q.aporte||0)));save();render();toast('Plan eliminado','ok');},
   signup:function(){cloudAuth('up',$('#au-mail').value.trim(),$('#au-pass').value);},
   signout:async function(){if(CL()&&S.profile&&!S.example){clearTimeout(pushT);var okp=await pushProfileNow();if(!okp){toast('No cierro la sesión: tu perfil todavía no está guardado en la nube','bad');return;}}sb.auth.signOut().then(function(){clearTimeout(pushT);cloud.user=null;cloud.groups=[];cloud.retos=[];S=defaults();D=null;mem=null;try{localStorage.removeItem(KEY);}catch(e){}location.hash='';render(false);toast('Sesión cerrada','ok');});},
   gSel:function(el){gSel=el.dataset.id;render();},
@@ -1489,7 +1534,8 @@ var ACT={
   obNext:function(){var e=validate(D);D.err=e;if(!e)D.step++;render(false);},
   obFinish:function(){var e=validate(D);D.err=e;if(e){render(false);return;}finishOnboard();},
   gusto:function(el){var v=el.dataset.v,i=D.gustos.indexOf(v);if(i<0)D.gustos.push(v);else D.gustos.splice(i,1);render();},
-  applyPlan:function(){var a=advice();S.profile.ahorro=a.monthly;if(a.od){var cur=S.plans[a.od.id]||{saved:0};S.plans[a.od.id]=Object.assign(cur,{on:true,target:a.target,months:a.months,saved:cur.saved||0});}save();render();toast('Plan aplicado: apartas '+eur(a.monthly)+' al mes','ok');},
+  subResume:function(el){var p=S.profile,x=S.subsPausa.filter(function(y){return y.id===el.dataset.id;})[0];if(!x)return;S.subsPausa=S.subsPausa.filter(function(y){return y.id!==x.id;});p.subs.push(x);p.gastos.suscripciones=subsSum(p.subs);save();render();toast(x.n+' reactivada','ok');},
+  applyPlan:function(){var a=advice(),pp=S.profile;a.cuts.filter(function(c){return c.sub;}).forEach(function(c){var x=pp.subs.filter(function(y){return y.id===c.sub;})[0];if(x){S.subsPausa.push(x);pp.subs=pp.subs.filter(function(y){return y.id!==c.sub;});}});pp.gastos.suscripciones=subsSum(pp.subs);S.misPlanes.forEach(function(q){q.aporte=0;});a.plans.forEach(function(it){it.q.aporte=it.share;});pp.ahorro=a.monthly;save();render();toast('Planes aplicados: apartas '+eur(a.monthly)+' al mes. Mira cómo cambia el ticket en Inicio','ok');},
   reset:function(){if(!resetArmed){resetArmed=true;render();setTimeout(function(){resetArmed=false;render();},4000);return;}resetArmed=false;if(CL())sb.from('perfiles').delete().eq('id',cloud.user.id).then(function(){});S=defaults();D=null;try{localStorage.removeItem(KEY);}catch(e){}mem=null;location.hash='';render(false);}
 };
 function decide(dir){
@@ -1577,6 +1623,9 @@ function onInput(e){
   if(el.dataset.d&&D){var v=el.value;if(el.dataset.d==='gusto')return;setPath(D,el.dataset.d,v);if(el.id==='o-i4'){var w1=$('#o-i4t-w');if(w1)w1.hidden=!(num(v)>0);}if(el.id==='o-g5'){var w2=$('#o-g5t-w');if(w2)w2.hidden=!(num(v)>0);}}
   if(el.id==='sb-n'){var si2=$('#sb-imp');if(si2&&!si2.value&&subPrice(el.value))si2.value=subPrice(el.value);}
   if(el.dataset.sub&&D){var pr=el.dataset.sub.split('.'),it=D.subs[+pr[0]];if(it){it[pr[1]]=el.value;if(pr[1]==='n'&&!num(it.imp)&&subPrice(el.value)){it.imp=String(subPrice(el.value));var ii=$('#o-sub-imp-'+pr[0]);if(ii)ii.value=it.imp;}var tt=$('#o-subs-tot');if(tt)tt.textContent=eur(D.subs.reduce(function(a,s){return a+num(s.imp);},0),2);}}
+  if(el.dataset.mi){var qq=S.misPlanes.filter(function(x){return x.id===el.dataset.pid;})[0];if(qq){var kk=el.dataset.mi;
+    if(kk==='nombre')qq.nombre=el.value.trim().slice(0,40);else if(kk==='months')qq.months=Math.min(240,Math.max(1,Math.round(num(el.value))||1));else qq[kk]=Math.max(0,num(el.value));
+    save();$('#mi-out').innerHTML=adviceHtml();}}
   if(el.dataset.sim){var s=simInit(),k=el.dataset.sim;if(k==='bono')s.bono=el.checked;else if(k==='tipo'){s.tipo=el.value;s.tope=el.value==='habitacion'?300:600;var tp=$('#sm-tope');if(tp)tp.value=s.tope;}else if(k==='n'){s.n=+el.value;$('#sm-n-o').textContent=s.n;}else s[k]=num(el.value);save();$('#sim-out').innerHTML=simOut();}
 }
 document.addEventListener('input',onInput);
