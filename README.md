@@ -39,3 +39,9 @@ El asistente usa la API de Claude a través de una Edge Function de Supabase (`s
 4. (Opcional) Cambia de modelo: `supabase secrets set CLAUDE_MODEL=claude-haiku-5-5`
 
 Las órdenes con efecto (bloquear tarjeta, recordatorios, Modo Supervivencia) siguen resolviéndose en la app; el resto va a Claude con tu presupuesto, ayudas y deudas de grupo como contexto. Al IA le llegan tu nombre, edad, estudios, los dos primeros dígitos del código postal y tus cifras del mes.
+
+
+## Seguridad de la base de datos
+Orden de ejecución en Supabase (SQL Editor): `sql/schema.sql` → `sql/migracion.sql` → `sql/retos.sql` → `sql/amigos.sql` → **`sql/seguridad.sql`**.
+Después ejecuta `sql/verificar_seguridad.sql`: todas las filas deben decir `OK`. `seguridad.sql` se puede repetir siempre que cambies algo.
+Regla de oro: toda tabla nueva necesita RLS y una política (`enable row level security` + `create policy`) antes de usarse.
