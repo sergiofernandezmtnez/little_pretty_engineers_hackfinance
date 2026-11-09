@@ -98,8 +98,11 @@ def chat():
         texto = "\n".join(b.text for b in r.content if b.type == "text").strip()
         return jsonify({"reply": texto or "No he podido responder esta vez."})
     except Exception as e:
-        return jsonify({"error": str(e)}), 502
+        # El detalle se queda en el log del servidor; al navegador no se le cuentan los internos
+        app.logger.error("Error al llamar a Claude: %s", e)
+        return jsonify({"error": "No se pudo obtener respuesta del asistente. Inténtalo de nuevo."}), 502
 
 
 if __name__ == "__main__":
-    app.run(debug=True, port=5000)
+    # El modo debug de Flask permite ejecutar código desde el navegador: solo si lo pides expresamente
+    app.run(debug=os.getenv("FLASK_DEBUG") == "1", host="127.0.0.1", port=5000)

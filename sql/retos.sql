@@ -1,4 +1,8 @@
--- Retos compartidos de STUD€NTIA. Ejecuta este script UNA vez en Supabase: SQL Editor -> New query -> Run.
+-- Retos compartidos de STUD€NTIA. Ejecuta este script en Supabase: SQL Editor -> New query -> Run.
+-- Se puede ejecutar varias veces sin problema (también para aplicar las mejoras de seguridad).
+--
+-- SEGURIDAD: RLS en las tres tablas, mínimo privilegio, código de invitación de 10 caracteres
+-- aleatorios y entrada a un reto SOLO con el código (no se puede insertar uno mismo a mano).
 
 -- 0) Limpieza: schema.sql creó una tabla "retos" antigua (catálogo con id de texto) que la app NO usa.
 --    Chocaba con la nueva (id uuid). Solo se borra si es la antigua.
@@ -20,7 +24,7 @@ create table if not exists public.retos (
   dias int not null check (dias between 1 and 365),
   ahorro_dia numeric not null default 0,
   inicio date not null default current_date,
-  codigo text not null unique default substr(md5(random()::text || clock_timestamp()::text), 1, 6),
+  codigo text not null unique default substr(replace(gen_random_uuid()::text, '-', ''), 1, 10),
   created_at timestamptz not null default now()
 );
 
@@ -39,6 +43,26 @@ create table if not exists public.reto_checks (
   primary key (reto_id, user_id, fecha)
 );
 
+-- Si las tablas ya existían (versión anterior), ponemos el código fuerte a los retos NUEVOS.
+-- (Los retos ya creados conservan su código de 6 caracteres; ver el final del archivo para renovarlos.)
+alter table public.retos alter column codigo set default substr(replace(gen_random_uuid()::text, '-', ''), 1, 10);
+
+-- Límites de longitud (NOT VALID: se aplican a lo que se inserte desde ahora, sin tocar filas antiguas)
+do $$
+declare c record;
+begin
+  for c in select * from (values
+    ('retos',         'retos_nombre_len',        'check (char_length(nombre) between 1 and 80)'),
+    ('retos',         'retos_descripcion_len',   'check (descripcion is null or char_length(descripcion) <= 500)'),
+    ('retos',         'retos_ahorro_rango',      'check (ahorro_dia between 0 and 100000)'),
+    ('reto_miembros', 'reto_miembros_nombre_len','check (char_length(nombre) between 1 and 80)')
+  ) as v(t, n, d) loop
+    if not exists (select 1 from pg_constraint where conname = c.n and conrelid = ('public.' || c.t)::regclass) then
+      execute format('alter table public.%I add constraint %I %s not valid', c.t, c.n, c.d);
+    end if;
+  end loop;
+end $$;
+
 alter table public.retos enable row level security;
 alter table public.reto_miembros enable row level security;
 alter table public.reto_checks enable row level security;
@@ -50,41 +74,59 @@ returns boolean language sql security definer set search_path = public stable as
 $$;
 
 drop policy if exists retos_select on public.retos;
-create policy retos_select on public.retos for select using (creador = auth.uid() or public.es_miembro_reto(id));
+create policy retos_select on public.retos for select to authenticated
+  using (creador = auth.uid() or public.es_miembro_reto(id));
 drop policy if exists retos_insert on public.retos;
-create policy retos_insert on public.retos for insert with check (creador = auth.uid());
+create policy retos_insert on public.retos for insert to authenticated with check (creador = auth.uid());
 drop policy if exists retos_delete on public.retos;
-create policy retos_delete on public.retos for delete using (creador = auth.uid());
+create policy retos_delete on public.retos for delete to authenticated using (creador = auth.uid());
 
 drop policy if exists miembros_select on public.reto_miembros;
-create policy miembros_select on public.reto_miembros for select using (user_id = auth.uid() or public.es_miembro_reto(reto_id));
+create policy miembros_select on public.reto_miembros for select to authenticated
+  using (user_id = auth.uid() or public.es_miembro_reto(reto_id));
+-- Insertar a mano solo puede hacerlo el CREADOR del reto (para apuntarse a su propio reto).
+-- Los demás entran únicamente con el código, a través de unirse_reto().
 drop policy if exists miembros_insert on public.reto_miembros;
-create policy miembros_insert on public.reto_miembros for insert with check (user_id = auth.uid());
+create policy miembros_insert on public.reto_miembros for insert to authenticated
+  with check (user_id = auth.uid()
+              and exists (select 1 from public.retos r where r.id = reto_id and r.creador = auth.uid()));
 drop policy if exists miembros_delete on public.reto_miembros;
-create policy miembros_delete on public.reto_miembros for delete using (user_id = auth.uid());
+create policy miembros_delete on public.reto_miembros for delete to authenticated using (user_id = auth.uid());
 
 -- Cada integrante solo puede apuntar (o quitar) sus propios días; todos los miembros ven los de los demás.
+-- No se pueden apuntar días futuros ni de hace más de un año.
 drop policy if exists checks_select on public.reto_checks;
-create policy checks_select on public.reto_checks for select using (public.es_miembro_reto(reto_id));
+create policy checks_select on public.reto_checks for select to authenticated
+  using (public.es_miembro_reto(reto_id));
 drop policy if exists checks_insert on public.reto_checks;
-create policy checks_insert on public.reto_checks for insert with check (user_id = auth.uid() and public.es_miembro_reto(reto_id));
+create policy checks_insert on public.reto_checks for insert to authenticated
+  with check (user_id = auth.uid() and public.es_miembro_reto(reto_id)
+              and fecha between current_date - 365 and current_date + 1);
 drop policy if exists checks_delete on public.reto_checks;
-create policy checks_delete on public.reto_checks for delete using (user_id = auth.uid());
+create policy checks_delete on public.reto_checks for delete to authenticated using (user_id = auth.uid());
 
--- Unirse a un reto con su código
+-- Unirse a un reto con su código (solo usuarios con sesión)
 create or replace function public.unirse_reto(cod text, mi_nombre text)
 returns uuid language plpgsql security definer set search_path = public as $$
-declare rid uuid;
+declare rid uuid; n text := left(trim(coalesce(mi_nombre, '')), 80);
 begin
   if auth.uid() is null then raise exception 'Inicia sesión primero'; end if;
-  select id into rid from public.retos where codigo = lower(trim(cod));
+  if n = '' then raise exception 'Escribe tu nombre'; end if;
+  select id into rid from public.retos where codigo = lower(trim(coalesce(cod, '')));
   if rid is null then raise exception 'Código de reto no válido'; end if;
-  insert into public.reto_miembros (reto_id, user_id, nombre) values (rid, auth.uid(), mi_nombre)
+  insert into public.reto_miembros (reto_id, user_id, nombre) values (rid, auth.uid(), n)
     on conflict (reto_id, user_id) do nothing;
   return rid;
 end $$;
 
--- Permisos y recarga de la API
-grant all on public.retos, public.reto_miembros, public.reto_checks to authenticated;
-grant execute on function public.es_miembro_reto(uuid), public.unirse_reto(text, text) to authenticated;
+-- Permisos (mínimo privilegio) y recarga de la API
+revoke all on public.retos, public.reto_miembros, public.reto_checks from anon, authenticated;
+grant select, insert, delete on public.retos, public.reto_miembros, public.reto_checks to authenticated;
+revoke execute on function public.es_miembro_reto(uuid), public.unirse_reto(text, text) from public, anon;
+grant  execute on function public.es_miembro_reto(uuid), public.unirse_reto(text, text) to authenticated;
 notify pgrst, 'reload schema';
+
+-- OPCIONAL: renovar los códigos de los retos que ya existen (los códigos antiguos de 6 caracteres
+-- se podrían adivinar). Si lo ejecutas, tendrás que volver a pasar el código nuevo a tus amigos.
+-- Quita los "--" de la línea siguiente para aplicarlo:
+-- update public.retos set codigo = substr(replace(gen_random_uuid()::text, '-', ''), 1, 10) where char_length(codigo) < 10;

@@ -1,1 +1,14 @@
+# Secretos: NUNCA se suben al repositorio
 .env
+.env.*
+!.env.example
+supabase/.env
+*.key
+*.pem
+
+# Dependencias y compilados (se regeneran con npm install / pip install)
+node_modules/
+dist/
+__pycache__/
+*.pyc
+.venv/

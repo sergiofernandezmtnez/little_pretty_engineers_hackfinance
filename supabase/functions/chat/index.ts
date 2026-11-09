@@ -69,10 +69,11 @@ Deno.serve(async (req) => {
       }),
     });
     const data = await r.json();
-    if (!r.ok) return json({ error: data?.error?.message ?? "Error al llamar a Claude" }, 502);
+    if (!r.ok) { console.error("Anthropic:", r.status, data?.error?.message); return json({ error: "No se pudo obtener respuesta del asistente" }, 502); }
     const reply = (data.content ?? []).filter((b: { type: string }) => b.type === "text").map((b: { text: string }) => b.text).join("\n").trim();
     return json({ reply: reply || "No he podido responder esta vez." });
   } catch (e) {
-    return json({ error: String((e as Error).message ?? e) }, 500);
+    console.error("chat:", e);                     // el detalle queda en los logs de Supabase, no en la respuesta
+    return json({ error: "Error interno del asistente" }, 500);
   }
 });
