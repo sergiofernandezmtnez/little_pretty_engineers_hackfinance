@@ -84,6 +84,11 @@ header.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;backgroun
 .tabs{display:flex;gap:2px;overflow-x:auto;scrollbar-width:none}
 .tabs::-webkit-scrollbar{display:none}
 .tab{padding:10px 12px;color:var(--muted);text-decoration:none;font:600 14px var(--f-body);border-bottom:3px solid transparent;white-space:nowrap}
+.nb{display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:18px;padding:0 5px;margin-left:6px;border-radius:9px;background:var(--bad);color:#fff;font:700 11px var(--f-body);vertical-align:middle}
+.alertp{border:2px solid var(--accent)}
+.jump{display:flex;gap:8px;flex-wrap:wrap}
+.mycode{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 12px;background:var(--surface-2);border-radius:8px}
+.mycode strong{font-size:22px;letter-spacing:.06em}
 .tab[aria-current=page]{color:var(--ink);border-bottom-color:var(--accent)}
 @media (max-width:640px){.seg{order:3;width:100%}.seg-b{flex:1;padding-inline:4px}}
 .main{padding-block:24px 28px;display:grid;gap:22px;align-content:start}
@@ -135,6 +140,14 @@ svg.ch .tx.b{fill:var(--ink);font-weight:600}
 .vc-num{font-size:20px;letter-spacing:.12em}
 .vc-chip{width:34px;height:24px;border-radius:5px;border:2px solid currentColor;opacity:.7}
 
+/* catálogo oficial */
+.cat-i{display:grid;gap:6px;padding:12px 0;border-top:1px solid var(--line)}
+.cat-list .cat-i:first-child{border-top:0}
+.cat-top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+.cat-top strong{min-width:0}
+.cat-meta{color:var(--muted);font-size:13px}
+.cat-i details summary{cursor:pointer;font-weight:600;font-size:13px}
+.cat-i details p{margin:6px 0 0;font-size:13px}
 /* ayudas */
 .deck{position:relative;height:500px;max-width:460px;width:100%;margin-inline:auto}
 .sc{position:absolute;inset:0;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:20px;display:flex;flex-direction:column;gap:10px;overflow:auto;touch-action:pan-y;box-shadow:var(--shadow)}
@@ -270,9 +283,20 @@ svg.ch .tx.b{fill:var(--ink);font-weight:600}
 .bd{list-style:none;margin:6px 0 0;padding:0;display:grid;gap:4px;font-size:13px}
 .bd li{display:flex;justify-content:space-between;gap:10px}
 .bd li.t{border-top:1px solid var(--line);padding-top:4px;font-weight:700}
+
+/* Banner de créditos (visible en todas las páginas) */
+body{display:flex;flex-direction:column;min-height:100vh;min-height:100dvh}
+#app{flex:1 0 auto}
+.credits{flex-shrink:0;background:var(--ink);color:#fff;text-align:center;padding:16px max(16px,env(safe-area-inset-left,0px)) calc(16px + env(safe-area-inset-bottom,0px));font-size:13px;line-height:1.55}
+.credits p{margin:0 auto;max-width:90ch}
+.credits strong{font-weight:600}
+.credits .uni{margin-top:6px;opacity:.85}
+.credits address{font-style:normal;opacity:.75;margin-top:2px}
+.tk .btn{display:inline-block;cursor:pointer;text-align:center}.tk details{margin-top:8px}.tk pre{white-space:pre-wrap;font-size:12px;max-height:180px;overflow:auto;margin:6px 0 0}
 </style>
 
 <div id="app"></div>
+<div class="credits" role="contentinfo"><p><strong>Hecho por:</strong> Karla María Carlos, Sergio Fernández, Iván García, Adrián González, Fabiana García, María González.</p><p class="uni">Universidad Carlos III de Madrid</p><address>Campus de Leganés · Av. de la Universidad, 30 · 28911 Leganés, Madrid</address></div>
 <div id="sos" class="ov" role="dialog" aria-modal="true" aria-label="Modo Supervivencia" hidden></div>
 <div id="toasts" aria-live="polite"></div>
 
@@ -377,7 +401,7 @@ var RETOS=[
  {id:'gratis',t:'Ocio gratis',dias:7,pts:12,est:10,c:'Ocio',d:'Una semana de planes que no cuestan nada: parque, biblioteca, quedadas en casa.'},
  {id:'hormiga',t:'Cero gastos hormiga',dias:30,pts:8,est:3,c:'Gastos hormiga',d:'Un mes sin pequeñas compras que se te olvidan al día siguiente.'}
 ];
-var AMIGOS=['Lucía','Marcos','Aitana','Dani'];
+var AMIGOS=[];   /* sin personas inventadas: los amigos reales se añaden en Grupos → Amigos */
 var LV=[[0,'Novato'],[60,'Ahorrador'],[200,'Estratega'],[500,'Maestro del táper']];
 var r10=function(x){return Math.round(x/10)*10;};
 function floorBasicos(){return S.profile&&S.profile.vivienda==='familia'?120:200;}
@@ -415,7 +439,7 @@ var SUG=['¿Cuánto puedo gastar hoy?','¿Puedo gastarme 35 € en unas zapatill
 /* ---------- estado ---------- */
 var KEY='finmes.v1';
 var mem=null;
-function defaults(){return {profile:null,mode:'normal',groups:[],gastos:[],saved:[],discarded:[],hist:[],joined:{},events:[],plans:{},card:{blocked:false,auto:true,alertDaily:true,alertPct:true},chat:[],sim:null,ingExtra:[],myRetos:[],retoHist:[],subsPausa:[],misPlanes:[],planesInit:false,lastDigest:'',example:false,flags:{},closed:{},alerts:{mes:'',hit:[]},modeMonth:''};}
+function defaults(){return {profile:null,mode:'normal',groups:[],gastos:[],saved:[],discarded:[],hist:[],joined:{},events:[],plans:{},card:{blocked:false,auto:true,alertDaily:true,alertPct:true},chat:[],sim:null,ingExtra:[],myRetos:[],locPeople:{},retoHist:[],subsPausa:[],misPlanes:[],planesInit:false,lastDigest:'',example:false,flags:{},closed:{},alerts:{mes:'',hit:[]},modeMonth:''};}
 function load(){try{var r=localStorage.getItem(KEY);if(r)return JSON.parse(r);}catch(e){}return mem;}
 var curMes=function(){var t=new Date();return t.getFullYear()+'-'+pad(t.getMonth()+1);};
 var nextMes=function(k){var a=k.split('-').map(Number);a[1]++;if(a[1]>12){a[1]=1;a[0]++;}return a[0]+'-'+pad(a[1]);};
@@ -424,9 +448,11 @@ function fixState(){
   if(S.mode==='supervivencia'||S.mode==='rojo')S.mode='sos';
   if(!MODES[S.mode])S.mode='normal';
   if(!S.groups)S.groups=[];
+  if(!S.locPeople)S.locPeople={};
   if(!S.ingExtra)S.ingExtra=[];
   if(!S.myRetos)S.myRetos=[];
   if(!S.retoHist)S.retoHist=[];
+  S.groups=(S.groups||[]).filter(function(g){return !(g&&g.name==='Viaje a Roma'&&g.members&&g.members.indexOf('Lucía')>=0);});
   if(!S.subsPausa)S.subsPausa=[];
   if(!S.misPlanes)S.misPlanes=[];
   if(!S.closed)S.closed={};
@@ -446,6 +472,8 @@ function lvl(){return MODES[S.mode].lvl;}
 function save(){mem=S;try{localStorage.setItem(KEY,JSON.stringify(S));}catch(e){}pushProfile();}
 var D=null;               // borrador del registro
 var ayFilter='todas';
+/* catálogo oficial de becas y ayudas (tabla becas_ayudas de Supabase, solo lectura y con sesión) */
+var CAT={rows:null,err:'',busy:false,f:'todas'};
 var now0=new Date();
 var calCur={y:now0.getFullYear(),m:now0.getMonth()};
 var calSel=ymd(now0);
@@ -456,12 +484,12 @@ var resetArmed=false;
 function closeMonths(){
   var p=S.profile;if(!p||!p.inicio)return false;
   ensurePlanes();
-  var cm=curMes(),k=p.inicio,carry=0,changed=false,guard=0;
+  var cm=curMes(),k=p.inicio,carry=Math.max(0,+p.saldo||0),changed=false,guard=0;
   while(k<cm&&guard++<240){
     if(S.closed[k]){carry=S.closed[k].out;k=nextMes(k);continue;}
     var ing=sumObj(p.ingresos),fij=sumObj(p.gastos),ah=+p.ahorro||0;
     var spent=S.gastos.filter(function(g){return g.fecha.indexOf(k)===0;}).reduce(function(a,g){return a+g.importe;},0);
-    var ex=extraDe(k),base=Math.max(0,ing-fij-ah)+ex,avail=base+carry,out=Math.max(0,Math.round((avail-spent)*100)/100);
+    var ex=extraDe(k),base=Math.max(0,ing-fij-ah)+ex,avail=base+carry,out=Math.round((avail-spent)*100)/100;   /* puede ser negativo: números rojos que se arrastran */
     S.closed[k]={base:base,carryIn:carry,extra:ex,spent:Math.round(spent*100)/100,out:out,ahorro:ah};
     if(ah>0)S.misPlanes.forEach(function(q){if(q.aporte>0)q.saved=(q.saved||0)+q.aporte;});
     carry=out;changed=true;k=nextMes(k);
@@ -477,7 +505,7 @@ function extraMedio(){
   return Math.round(keys.reduce(function(a,k){return a+extraDe(k);},0)/keys.length*100)/100;
 }
 function ingMedio(){return Math.round((sumObj(S.profile.ingresos)+extraMedio())*100)/100;}
-function carryNow(){var cm=curMes(),keys=Object.keys(S.closed||{}).filter(function(k){return k<cm;}).sort();return keys.length?S.closed[keys[keys.length-1]].out:0;}
+function carryNow(){var cm=curMes(),keys=Object.keys(S.closed||{}).filter(function(k){return k<cm;}).sort();return keys.length?S.closed[keys[keys.length-1]].out:Math.max(0,+(S.profile&&S.profile.saldo)||0);}
 function ahorroAcum(){return Object.keys(S.closed||{}).reduce(function(a,k){return a+(S.closed[k].ahorro||0);},0);}
 function model(){
   var p=S.profile,now=new Date(),y=now.getFullYear(),mo=now.getMonth(),day=now.getDate(),n=dim(y,mo);
@@ -579,15 +607,19 @@ function myStats(m){
   var days=uniqN(m.p['Tú']),t=ymd(new Date()),left=Math.max(0,Math.round((parse(retoEnd(m.start,m.dias))-parse(t))/864e5)+1);
   return {days:days,done:days>=m.dias,pct:Math.min(100,Math.round(days/m.dias*100)),saved:days*m.est,today:(m.p['Tú']||[]).indexOf(t)>=0,left:Math.min(m.dias,left)};
 }
-function myRank(m){return ['Tú'].concat(m.amigos).map(function(n){return {n:n,d:uniqN(m.p[n]),me:n==='Tú'};}).sort(function(a,b){return b.d-a.d;});}
+/* Personas que juegan desde ESTE mismo móvil (sin cuenta): en retos propios van en m.amigos/m.p; en retos compartidos y de la app, en S.locPeople */
+function locList(m){if(!m.shared)return m.amigos.map(function(n){return {n:n,d:m.p[n]||[]};});var o=S.locPeople[m.id]||{};return Object.keys(o).map(function(n){return {n:n,d:o[n]};});}
+function myRank(m){var r=[{n:'Tú',d:uniqN(m.p['Tú']),me:true}];if(m.shared)m.amigos.forEach(function(n){r.push({n:n,d:uniqN(m.p[n])});});locList(m).forEach(function(x){r.push({n:x.n,d:uniqN(x.d)});});return r.sort(function(a,b){return b.d-a.d;});}
+function locRows(k,list){var t=ymd(new Date());return list.map(function(x){var dn=x.d.indexOf(t)>=0;return '<span class="row"><button class="btn sm" data-act="locCheck" data-k="'+esc(k)+'" data-who="'+esc(x.n)+'"'+(dn?' disabled':'')+'>'+esc(x.n)+(dn?' ✓':' hoy')+'</button><button class="btn sm ghost" data-act="locDel" data-k="'+esc(k)+'" data-who="'+esc(x.n)+'" aria-label="Quitar a '+esc(x.n)+'">✕</button></span>';}).join('');}
+function locForm(k){return '<form data-form="locadd" data-k="'+esc(k)+'" class="row"><label class="f grow"><span>Añadir a alguien que juega en este móvil</span><input name="n" maxlength="20" placeholder="Su nombre" autocomplete="off"></label><button class="btn sm" type="submit">Añadir</button></form>';}
 /* Cuando un reto termina (lo completas o se acaba el plazo) pasa a "finalizado" con su clasificación congelada; el reto vuelve a estar disponible para empezar otro nuevo */
 function closeRetos(){
   var t=ymd(new Date()),n=0;
   Object.keys(S.joined).forEach(function(id){
     var j=S.joined[id],r=RETOS.filter(function(x){return x.id===id;})[0];if(!r)return;
     var st=retoStats(id);if(!(st.done||t>retoEnd(j.start,r.dias)))return;
-    var arr=[{n:'Tú',d:st.days,me:1}].concat(AMIGOS.map(function(a){return {n:a,d:friendDays(a,r)};})).sort(function(a,b){return b.d-a.d;});
-    S.retoHist.unshift({id:uid(),rid:id,custom:false,t:r.t,c:r.c,d:r.d,dias:r.dias,start:j.start,end:t,days:st.days,done:st.done,saved:st.saved,puntos:st.days*r.pts+(st.done?50:0),rank:arr,ejemplo:true});
+    var lo=S.locPeople['app:'+id]||{},arr=[{n:'Tú',d:st.days,me:1}].concat(Object.keys(lo).map(function(a){return {n:a,d:uniqN(lo[a])};})).sort(function(a,b){return b.d-a.d;});delete S.locPeople['app:'+id];
+    S.retoHist.unshift({id:uid(),rid:id,custom:false,t:r.t,c:r.c,d:r.d,dias:r.dias,start:j.start,end:t,days:st.days,done:st.done,saved:st.saved,puntos:st.days*r.pts+(st.done?50:0),rank:arr,ejemplo:false});
     delete S.joined[id];n++;
   });
   var arch=function(m){var st=myStats(m);if(!(st.done||t>retoEnd(m.start,m.dias)))return false;
@@ -646,7 +678,16 @@ function checkAlerts(fromUser){
   var m=model(),cm=curMes();
   if(S.alerts.mes!==cm)S.alerts={mes:cm,hit:[]};
   if(m.budget<=0)return;
-  var pct=Math.max(0,m.remaining)/m.budget*100,nuevos=UMBRALES.filter(function(t){return pct<=t&&S.alerts.hit.indexOf(t)<0;});
+  var pct=Math.max(0,m.remaining)/m.budget*100;
+  /* si vuelves a tener más del umbral (por un ingreso, un gasto borrado...), el aviso puede volver a saltar */
+  S.alerts.hit=S.alerts.hit.filter(function(t){return pct<=t;});
+  /* el modo Fin de mes que se activó solo se desactiva en cuanto vuelves a superar el 5 % */
+  if(S.mode==='sos'&&S.modeAuto&&pct>5){
+    setSOS(false);
+    toast('Has vuelto a superar el 5 %: modo Normal','ok');
+    say('Vuelves a tener más del **5 %** del presupuesto ('+eur(m.remaining,2)+'), así que he vuelto al **modo Normal**.',true);
+  }
+  var nuevos=UMBRALES.filter(function(t){return pct<=t&&S.alerts.hit.indexOf(t)<0;});
   if(!nuevos.length)return;
   nuevos.forEach(function(t){S.alerts.hit.push(t);});
   var t=Math.min.apply(null,nuevos);
@@ -659,7 +700,7 @@ function checkAlerts(fromUser){
   if(t<=5&&S.mode!=='sos'){
     setSOS(true,true);
     toast('Modo Fin de mes (SOS) activado automáticamente','bad');
-    say('Te queda menos del **5 %** del presupuesto, así que he activado el **modo Fin de mes (SOS)**. Volverás a modo Normal el mes que viene.',true);
+    say('Te queda menos del **5 %** del presupuesto, así que he activado el **modo Fin de mes (SOS)**. Volverás a modo Normal en cuanto vuelvas a superar el 5 % (o el mes que viene).',true);
     sysNotify('Modo Fin de mes (SOS) activado','Te queda menos del 5 % del presupuesto.');
     if(fromUser)setTimeout(openSOS,80);
   }
@@ -795,11 +836,22 @@ async function cloudLoad(){
   cloud.err='';
   cloud.groups=r.data.map(function(g){
     var nm={},ids={};
-    g.grupo_miembros.forEach(function(m){nm[m.id]=(m.user_id&&m.user_id===cloud.user.id)?ME:m.nombre;ids[nm[m.id]]=m.id;});
-    return {id:g.id,name:g.nombre,code:g.codigo,ids:ids,members:g.grupo_miembros.map(function(m){return nm[m.id];}),
+    var used={};
+    g.grupo_miembros.forEach(function(m){var n=(m.user_id&&m.user_id===cloud.user.id)?ME:m.nombre,k=n,c=1;while(used[k]){c++;k=n+' ('+c+')';}used[k]=1;nm[m.id]=k;ids[k]=m.id;});
+    return {id:g.id,name:g.nombre,code:g.codigo,ids:ids,members:g.grupo_miembros.map(function(m){return nm[m.id];}).sort(function(a,b){return (b===ME)-(a===ME);}),
       exp:g.grupo_gastos.map(function(e){return {id:e.id,what:e.concepto,amt:e.importe_cents/100,payer:nm[e.pagador_id],split:e.grupo_reparto.map(function(x){return nm[x.miembro_id];}),date:e.fecha};}),
       paid:g.grupo_pagos.map(function(p){return {from:nm[p.de_id],to:nm[p.a_id],amt:p.importe_cents/100};})};
   });
+}
+async function loadCat(){
+  if(!CL()||CAT.busy)return;
+  CAT.busy=true;
+  try{
+    var r=await sb.from('becas_ayudas').select('id,titulo,organismo,categoria,cuantia_maxima,requisitos,plazo,estado,ambito,enlace_oficial').order('id');
+    if(r.error){CAT.err=r.error.message;CAT.rows=[];}else{CAT.err='';CAT.rows=r.data||[];}
+  }catch(e){CAT.err=String(e.message||e);CAT.rows=[];}
+  CAT.busy=false;
+  if(curView()==='ayudas')render();
 }
 async function cloudDo(fn,ok){
   try{var r=await fn();if(r&&r.error)throw r.error;await cloudLoad();render();if(ok)toast(ok,'ok');}
@@ -909,11 +961,6 @@ function cloudPanel(){
   if(!cloud.user)return '<form class="panel" data-form="auth"><h2>Entra para compartir grupos</h2><label class="f"><span>Email</span><input id="au-mail" type="email" required autocomplete="email"></label><label class="f"><span>Contraseña</span><input id="au-pass" type="password" minlength="6" required autocomplete="current-password"></label><div class="row"><button class="btn primary" type="submit">Entrar</button><button class="btn" type="button" data-act="signup">Crear cuenta</button></div></form>';
   return '<section class="panel"><h2>Cuentas en la nube<span class="pill ok">Sincronizado</span></h2><p class="hint">'+esc(cloud.user.email||'')+'</p>'+(cloud.err?'<p class="hint">'+esc(cloud.err)+'</p>':'')+'<form data-form="join" class="row"><label class="f grow"><span>Unirte con un código</span><input id="jn-code" type="text" maxlength="12" required></label><button class="btn" type="submit">Unirme</button></form><button class="btn sm ghost" data-act="signout">Cerrar sesión</button></section>';
 }
-function gExample(){
-  var all=[ME,'Lucía','Marcos','Aitana'];
-  function e(w,a,p,sp){return {id:uid(),what:w,amt:a,payer:p,split:sp||all.slice(),date:ymd(new Date())};}
-  return {id:uid(),name:'Viaje a Roma',members:all.slice(),exp:[e('Vuelos',240,ME),e('Apartamento',380,'Lucía'),e('Cena en Trastevere',64,'Marcos',[ME,'Marcos','Aitana']),e('Metro y bus',30,'Aitana')],paid:[]};
-}
 function groupBot(){
   if(!gl().length)return {t:'Todavía no tienes grupos. Crea uno para repartir gastos con tus amigos.',acts:[{l:'Abrir grupos',h:'#grupos'}]};
   var L=[];gl().forEach(function(g){gDebts(g).forEach(function(d){if(d.to===ME)L.push('• **'+d.from+'** te debe **'+eur(d.c/100,2)+'** ('+g.name+')');else if(d.from===ME)L.push('• Debes **'+eur(d.c/100,2)+'** a **'+d.to+'** ('+g.name+')');});});
@@ -928,28 +975,40 @@ function invitarHtml(tipo,ref,miembros){
   var id='inv-'+tipo+'-'+ref;
   return '<div class="row"><label class="f grow"><span>Invitar a un amigo</span><select id="'+id+'"><option value="">Elige un amigo</option>'+opts.map(function(a){return '<option value="'+esc(a.id)+'">'+esc(a.nombre)+'</option>';}).join('')+'</select></label><button type="button" class="btn sm" data-act="invitar" data-tipo="'+tipo+'" data-ref="'+esc(ref)+'" data-sel="'+id+'">Invitar</button></div><p class="hint">Le llegará una invitación y decidirá si quiere entrar.</p>';
 }
+function nGrupos(){return redOk()?cloud.red.recibidas.length+cloud.red.invitaciones.filter(function(i){return i.tipo==='grupo';}).length:0;}
+function nRetosInv(){return redOk()?cloud.red.invitaciones.filter(function(i){return i.tipo==='reto';}).length:0;}
+function nbadge(v){var n=v==='grupos'?nGrupos():v==='retos'?nRetosInv():0;return n?'<span class="nb" aria-label="'+n+(n===1?' pendiente':' pendientes')+'">'+n+'</span>':'';}
+function recItems(){return cloud.red.recibidas.map(function(a){return '<li><span class="l"><strong>'+esc(a.nombre)+'</strong> quiere ser tu amigo<small>Si aceptas, podréis invitaros a grupos y retos</small></span><span class="row"><button class="btn primary sm" data-act="amResp" data-id="'+a.id+'" data-v="1">Aceptar</button><button class="btn sm ghost" data-act="amResp" data-id="'+a.id+'" data-v="0">Rechazar</button></span></li>';}).join('');}
+function pendHtml(){
+  if(!redOk())return '';
+  var n=nGrupos();if(!n)return '';
+  return '<section class="panel alertp"><h2>Tienes '+n+(n===1?' cosa pendiente':' cosas pendientes')+'<span class="nb">'+n+'</span></h2><ul class="list">'+recItems()+invItems('grupo')+'</ul></section>';
+}
+function invItems(tipo){
+  return cloud.red.invitaciones.filter(function(i){return i.tipo===tipo;}).map(function(i){return '<li><span class="l"><strong>'+esc(i.de)+'</strong> te invita al '+(i.tipo==='reto'?'reto':'grupo')+' «'+esc(i.titulo||'')+'»<small>¿Quieres entrar?</small></span><span class="row"><button class="btn primary sm" data-act="invResp" data-id="'+i.id+'" data-v="1">Entrar</button><button class="btn sm ghost" data-act="invResp" data-id="'+i.id+'" data-v="0">No, gracias</button></span></li>';}).join('');
+}
 function amigosHtml(){
   if(!CL())return '<section class="panel"><h2>Amigos</h2><p class="hint">Inicia sesión (arriba) para añadir amigos, compartir retos con ellos e invitarles a tus grupos.</p></section>';
   if(cloud.redErr)return '<section class="panel"><h2>Amigos</h2><p class="hint">Para añadir amigos hay que crear las tablas de amistades en Supabase (ver amigos.sql). '+esc(cloud.redErr)+'</p></section>';
-  var R=cloud.red,inv=R.invitaciones.map(function(i){return '<li><span class="l"><strong>'+esc(i.de)+'</strong> te invita al '+(i.tipo==='reto'?'reto':'grupo')+' «'+esc(i.titulo||'')+'»<small>¿Quieres entrar?</small></span><span class="row"><button class="btn primary sm" data-act="invResp" data-id="'+i.id+'" data-v="1">Entrar</button><button class="btn sm ghost" data-act="invResp" data-id="'+i.id+'" data-v="0">No, gracias</button></span></li>';}).join('');
-  var rec=R.recibidas.map(function(a){return '<li><span class="l"><strong>'+esc(a.nombre)+'</strong> quiere ser tu amigo</span><span class="row"><button class="btn primary sm" data-act="amResp" data-id="'+a.id+'" data-v="1">Aceptar</button><button class="btn sm ghost" data-act="amResp" data-id="'+a.id+'" data-v="0">Rechazar</button></span></li>';}).join('');
-  var inviteTxt='Añádeme en STUD€NTIA con mi código de amigo '+R.codigo+' (Grupos → Amigos). '+location.href.split('#')[0];
+  var R=cloud.red;
+  var inviteTxt='Añádeme en STUD€NTIA con mi código de amigo '+R.codigo+' (Grupos → Amigos → «Código de tu amigo»). '+location.href.split('#')[0];
   return '<section class="panel"><h2>Amigos<span class="num">'+R.amigos.length+'</span><button type="button" class="btn sm ghost" data-act="redRefresh">Actualizar</button></h2>'+
-    (inv?'<h3>Invitaciones</h3><ul class="list">'+inv+'</ul>':'')+(rec?'<h3>Solicitudes de amistad</h3><ul class="list">'+rec+'</ul>':'')+
-    '<p class="hint">Tu código de amigo: <strong class="num">'+esc(R.codigo)+'</strong> <button type="button" class="btn sm ghost" data-act="copyInvite" data-t="'+esc(inviteTxt)+'">Copiar invitación</button></p>'+
-    '<form data-form="addamigo" class="row"><label class="f grow"><span>Añadir un amigo con su código</span><input id="am-code" maxlength="12" placeholder="p. ej. 3f9a1c07be" autocomplete="off"></label><button class="btn primary" type="submit">Añadir</button></form>'+
-    (R.enviadas.length?'<p class="hint">Solicitud enviada a '+R.enviadas.map(function(a){return esc(a.nombre);}).join(', ')+' (pendiente de que la acepte).</p>':'')+
-    (R.amigos.length?'<ul class="list">'+R.amigos.map(function(a){return '<li><span class="l">'+esc(a.nombre)+'</span><button class="btn sm ghost danger" data-act="amDel" data-id="'+esc(a.id)+'">Quitar</button></li>';}).join('')+'</ul>':'<p class="hint">Todavía no tienes amigos añadidos. Pásales tu código para que te añadan, o añade el suyo.</p>')+'</section>';
+    '<p class="hint"><strong>Cómo funciona:</strong> 1) pásale tu código a tu amigo, 2) él lo escribe aquí y tú aceptas su solicitud, 3) ya podéis invitaros a grupos y retos.</p>'+
+    '<div class="mycode"><span class="hint">Tu código</span><strong class="num">'+esc(R.codigo)+'</strong><button type="button" class="btn sm" data-act="copyInvite" data-t="'+esc(inviteTxt)+'">Copiar mensaje para mi amigo</button></div>'+
+    '<form data-form="addamigo" class="row"><label class="f grow"><span>Código de tu amigo</span><input id="am-code" maxlength="12" placeholder="Pégalo aquí" autocomplete="off"></label><button class="btn primary" type="submit">Enviar solicitud</button></form>'+
+    (R.enviadas.length?'<p class="hint">Solicitud enviada a '+R.enviadas.map(function(a){return '<strong>'+esc(a.nombre)+'</strong>';}).join(', ')+': falta que la acepte.</p>':'')+
+    '<h3>Tus amigos</h3>'+
+    (R.amigos.length?'<ul class="list">'+R.amigos.map(function(a){return '<li><span class="l">'+esc(a.nombre)+'</span><button class="btn sm ghost danger" data-act="amDel" data-id="'+esc(a.id)+'">Quitar</button></li>';}).join('')+'</ul><p class="hint">Para invitarles, abre uno de tus grupos o retos y elige a tu amigo en «Invitar a un amigo».</p>':'<p class="hint">Todavía no tienes amigos añadidos.</p>')+'</section>';
 }
 function vGrupos(){
   var gs=gl();
   if(!gs.some(function(x){return x.id===gSel;}))gSel=gs.length?gs[0].id:null;
   var g=gs.filter(function(x){return x.id===gSel;})[0];
   var chk=function(name,list,def){return list.map(function(n,i){return '<label class="sw"><input type="checkbox" name="'+name+'" value="'+esc(n)+'"'+(def(i)?' checked':'')+'>'+esc(n)+'</label>';}).join('');};
-  var form='<form class="panel" data-form="grupo"><h2>Nuevo grupo</h2><label class="f"><span>Nombre</span><input name="name" type="text" maxlength="40" required placeholder="Acampada en Vitoria"></label><div class="chips">'+chk('m',AMIGOS,function(i){return i<2;})+'</div><label class="f"><span>Otra persona (opcional)</span><input name="extra" type="text" maxlength="20"></label><button class="btn primary" type="submit">Crear grupo</button></form>';
-  var side='<div class="col">'+cloudPanel()+amigosHtml()+'<section class="panel"><h2>Tus grupos<span class="num">'+gs.length+'</span></h2>'+(gs.length?'<div class="chips">'+gs.map(function(x){return '<button class="chip" data-act="gSel" data-id="'+x.id+'" aria-pressed="'+(x.id===gSel)+'">'+esc(x.name)+'</button>';}).join('')+'</div>':'<p class="hint">Crea un grupo para repartir los gastos de un viaje, un piso o una comida.</p>')+(CL()?'':'<button class="btn" data-act="gExample">Cargar grupo de ejemplo</button>')+'</section>'+form+'</div>';
+  var form='<form class="panel" data-form="grupo"><h2>Nuevo grupo</h2><label class="f"><span>Nombre</span><input name="name" type="text" maxlength="40" required placeholder="Acampada en Vitoria"></label><p class="hint">Después de crear el grupo podrás invitar a tus amigos desde aquí.</p><label class="f"><span>Otra persona sin cuenta (opcional)</span><input name="extra" type="text" maxlength="20"></label><button class="btn primary" type="submit">Crear grupo</button></form>';
+  var side='<div class="col">'+cloudPanel()+amigosHtml()+'<section class="panel"><h2>Tus grupos<span class="num">'+gs.length+'</span></h2>'+(gs.length?'<div class="chips">'+gs.map(function(x){return '<button class="chip" data-act="gSel" data-id="'+x.id+'" aria-pressed="'+(x.id===gSel)+'">'+esc(x.name)+'</button>';}).join('')+'</div>':'<p class="hint">Crea un grupo para repartir los gastos de un viaje, un piso o una comida.</p>')+'</section>'+form+'</div>';
   var main;
-  if(!g)main='<section class="panel"><h2>Cuentas en grupo</h2><p class="hint">Aquí verás quién ha pagado qué y quién debe a quién. Prueba con el grupo de ejemplo o crea el tuyo.</p></section>';
+  if(!g)main='<section class="panel"><h2>Cuentas en grupo</h2><p class="hint">Aquí verás quién ha pagado qué y quién debe a quién. Crea tu primer grupo.</p></section>';
   else{
     var b=gBal(g),mine=b[ME]||0,ds=gDebts(g),tot=g.exp.reduce(function(a,e){return a+e.amt;},0);
     var dl=ds.map(function(d){
@@ -961,10 +1020,10 @@ function vGrupos(){
     }).join('');
     main='<section class="panel"><h2>'+esc(g.name)+'<button class="btn sm ghost danger" data-act="gDel" data-id="'+g.id+'">Borrar grupo</button></h2><div class="chips">'+g.members.map(function(n){return '<span class="chip tag">'+esc(n)+'</span>';}).join('')+'</div>'+(g.code?'<p class="hint">Código para invitar: <strong class="num">'+esc(g.code)+'</strong></p>'+invitarHtml('grupo',g.id,g.members):'')+'<p class="hint">Gasto total: <strong class="num">'+eur(tot,2)+'</strong>. Tu saldo: <strong class="num '+(mine>=0?'pos':'neg')+'">'+(mine>=0?'+':'−')+eur(Math.abs(mine)/100,2)+'</strong></p></section>'+
     '<section class="panel"><h2>Quién debe a quién</h2>'+(dl?'<ul class="list">'+dl+'</ul>':'<span class="pill ok">Todo saldado</span>')+'</section>'+
-    '<form class="panel" data-form="gexp" data-g="'+g.id+'"><h2>Añadir gasto</h2><div class="qa-row"><label class="f grow"><span>Concepto</span><input name="what" type="text" maxlength="40" required placeholder="Cena, gasolina, entradas..."></label><label class="f"><span>Importe (€)</span><input name="amt" type="number" inputmode="decimal" step="0.01" min="0.01" required></label><label class="f"><span>Pagó</span><select name="payer">'+g.members.map(function(n){return '<option>'+esc(n)+'</option>';}).join('')+'</select></label></div><p class="hint">Se reparte a partes iguales entre:</p><div class="chips">'+chk('w',g.members,function(){return true;})+'</div><button class="btn primary" type="submit">Añadir gasto</button></form>'+
+    '<form class="panel" data-form="gexp" data-g="'+g.id+'"><h2>Añadir gasto</h2><div class="qa-row"><label class="f grow"><span>Concepto</span><input name="what" type="text" maxlength="40" required placeholder="Cena, gasolina, entradas..."></label><label class="f"><span>Importe (€)</span><input name="amt" type="number" inputmode="decimal" step="0.01" min="0.01" required></label><label class="f"><span>Pagó</span><select name="payer">'+g.members.map(function(n){return '<option'+(n===ME?' selected':'')+'>'+esc(n)+'</option>';}).join('')+'</select></label></div><p class="hint">Se reparte a partes iguales entre:</p><div class="chips">'+chk('w',g.members,function(){return true;})+'</div><button class="btn primary" type="submit">Añadir gasto</button></form>'+
     '<section class="panel"><h2>Gastos<span class="num">'+g.exp.length+'</span></h2>'+(g.exp.length?'<ul class="list">'+g.exp.slice().reverse().map(function(e){return '<li><span class="l">'+esc(e.what)+'<small>Pagó '+esc(e.payer)+' · entre '+e.split.length+'</small></span><span class="row"><span class="num">'+eur(e.amt,2)+'</span><button class="btn sm ghost" data-act="gExpDel" data-g="'+g.id+'" data-id="'+e.id+'">Quitar</button></span></li>';}).join('')+'</ul>':'<p class="hint">Aún no hay gastos.</p>')+'</section>';
   }
-  return '<div><h1>Grupos</h1><p class="sub">Reparte gastos con tus amigos y recuérdales lo que te deben.</p></div><div class="cols"><div class="col">'+main+'</div>'+side+'</div>';
+  return '<div><h1>Grupos</h1><p class="sub">Reparte gastos con tus amigos y recuérdales lo que te deben.</p></div><div class="cols"><div class="col">'+pendHtml()+main+'</div>'+side+'</div>';
 }
 
 /* ---------- ocio y plan de ahorro recomendado ---------- */
@@ -1097,26 +1156,99 @@ function adviceHtml(){
 }
 
 
-var TABS=[['inicio','Inicio'],['ayudas','Ayudas'],['calendario','Calendario'],['retos','Retos'],['grupos','Grupos'],['emancipacion','Emancipación'],['planes','Planes'],['asistente','Asistente']];
+var TABS=[['inicio','Inicio'],['ayudas','Ayudas'],['calendario','Calendario'],['retos','Retos'],['grupos','Grupos'],['emancipacion','Emancipación'],['planes','Planes'],['asistente','Asistente'],['intereses','Intereses']];
 function curView(){var h=location.hash.slice(1);return VIEWS[h]?h:'inicio';}
 function fmt(t){return esc(t).replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').replace(/\n/g,'<br>');}
 function statusPill(m){return m.st==='ok'?'<span class="pill ok">En ritmo</span>':m.st==='warn'?'<span class="pill warn">Vas justo</span>':'<span class="pill bad">'+(m.budget<=0?'Sin margen':'Presupuesto agotado')+'</span>';}
 
 function ticketHtml(m){
-  var d=new Date();
+  var d=new Date(),p=S.profile;
   var diff=m.ideal-m.spent;
-  var line=m.budget<=0?'Tus gastos fijos y tu ahorro ya se llevan todos tus ingresos.':diff>=0?'Vas '+eur(diff,2)+' por debajo del ritmo ideal.':'Llevas '+eur(-diff,2)+' por encima del ritmo ideal.';
-  return '<section class="ticket" aria-label="Resumen de hoy">'+
+  var line=m.budget<=0?(m.carry<0?'Arrastras números rojos de meses anteriores: este mes toca recuperarlos.':'Tus gastos fijos y tu ahorro ya se llevan todos tus ingresos.'):diff>=0?'Vas '+eur(diff,2)+' por debajo del ritmo ideal.':'Llevas '+eur(-diff,2)+' por encima del ritmo ideal.';
+  var L=function(t,v,strong){return '<div><dt>'+(strong?'<strong>'+t+'</strong>':t)+'</dt><dd>'+(strong?'<strong>'+v+'</strong>':v)+'</dd></div>';};
+  var neg=m.ingresos-m.fijos-m.ahorro<0;
+  return '<section class="ticket" aria-label="Resumen del mes">'+
   '<div class="tk-head"><span>Ticket de hoy</span><span>'+esc(d.toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'long'}))+'</span></div>'+
-  '<dl class="tk-lines"><div><dt>Ingresos del mes</dt><dd>'+eur(m.ingresos)+'</dd></div><div><dt>− Gastos fijos</dt><dd>'+eur(m.fijos,2)+'</dd></div>'+(m.ahorro>0?'<div><dt>− Ahorro de tus planes</dt><dd>'+eur(m.ahorro)+'</dd></div>':'')+'<div><dt>= Presupuesto del mes</dt><dd>'+eur(m.base,2)+'</dd></div>'+(m.extra>0?'<div><dt>+ Ingresos extra de este mes</dt><dd>'+eur(m.extra,2)+'</dd></div>':'')+(m.carry>0?'<div><dt>+ Te sobró de meses anteriores</dt><dd>'+eur(m.carry,2)+'</dd></div>':'')+((m.carry>0||m.extra>0)?'<div><dt>= Total disponible</dt><dd>'+eur(m.budget,2)+'</dd></div>':'')+'<div><dt>Gastado hasta hoy</dt><dd>− '+eur(m.spent,2)+'</dd></div><div><dt>Te quedan</dt><dd>'+eur(m.remaining,2)+'</dd></div><div><dt>Días por delante, hoy incluido</dt><dd>÷ '+m.daysLeft+'</dd></div></dl>'+
-  '<div class="tk-total"><span>Hoy puedes gastar</span><strong class="hl num">'+eur(m.leftToday,2)+'</strong></div>'+
-  '<div class="tk-foot">'+statusPill(m)+'<span>'+esc(line)+'</span></div></section>';
+  '<dl class="tk-lines">'+(m.carry<0?L('Arrastras de meses anteriores (números rojos)','− '+eur(-m.carry,2)):L('Ya tenías en la cuenta',eur(m.carry,2)))+L('+ Ingresos del mes',eur(m.ingresos))+(m.extra>0?L('+ Ingresos extra de este mes',eur(m.extra,2)):'')+L('− Gastos fijos',eur(m.fijos,2))+(m.ahorro>0?L('− Ahorro de tus planes',eur(m.ahorro)):'')+(neg?L('Ajuste: tus gastos superan tus ingresos','+ '+eur(m.fijos+m.ahorro-m.ingresos,2)):'')+L('= Disponible este mes',eur(m.budget,2),true)+L('− Gastado hasta hoy',eur(m.spent,2))+'</dl>'+
+  '<div class="tk-total"><span>Te quedan este mes</span><strong class="hl num">'+eur(m.remaining,2)+'</strong></div>'+
+  '<div class="tk-foot">'+statusPill(m)+'<span>'+esc(line)+'</span></div>'+
+  '<p class="hint" style="margin:10px 0 0">Lo que no gastes se queda en tu cuenta y pasa al mes siguiente. Si te pasas, ese número rojo también pasa al mes siguiente y se resta de lo que ganes.</p>'+
+  '<details style="margin-top:8px"><summary>Dinero que ya tienes en la cuenta</summary><form data-form="saldo" class="row"><label class="f grow"><span>Lo que tenías al empezar a usar la app (€)</span><input name="v" type="number" inputmode="decimal" min="0" step="0.01" value="'+(+p.saldo>0?esc(p.saldo):'')+'" placeholder="0"></label><button class="btn sm" type="submit">Guardar</button></form></details></section>';
 }
 var qaKind='gasto';
 function movRecientes(){
   var a=S.gastos.map(function(g){return {k:'g',id:g.id,fecha:g.fecha,t:g.concepto,s:CATS[g.cat]?CATS[g.cat].l:g.cat,v:g.importe};});
   var b=(S.ingExtra||[]).map(function(i){return {k:'i',id:i.id,fecha:i.fecha,t:i.concepto,s:INGC[i.tipo]||'Ingreso',v:i.importe};});
   return a.concat(b).sort(function(x,y){return x.fecha<y.fecha?1:x.fecha>y.fecha?-1:0;}).slice(0,5);
+}
+/* ---------- escanear ticket (OCR en el navegador) ---------- */
+var tk={st:'idle'};
+var TK_CAT=[['salud',/farmaci|parafarm/],['fuera',/restaur|cafeter|burger|mcdonald|telepizza|domino|starbucks|kebab|pizzer|taberna|\bbar\b|cerveceri|bocadill|vips|foster/],['transporte',/renfe|\bmetro\b|gasolin|repsol|cepsa|\bbp\b|\bshell\b|\balsa\b|\bemt\b|\btaxi\b|cabify|\buber\b|parking/],['estudios',/librer|papeler|fotocop|reprograf|casa del libro/],['ocio',/cinesa|yelmo|\bcine\b|teatro|museo/],['compras',/zara|primark|h&m|bershka|decathlon|ikea|mediamarkt|fnac|amazon|leroy/],['comida',/mercadona|carrefour|\bdia\b|lidl|aldi|alcampo|eroski|consum|supermerc|hipercor|supersol|ahorramas|froiz|gadis|panader|fruter|carnicer|pescader/]];
+function tkNum(x){var m=String(x).replace(/\s/g,'').match(/^(\d{1,3}(?:[.,]\d{3})+|\d+)[.,](\d{2})$/);return m?parseFloat(m[1].replace(/[.,]/g,'')+'.'+m[2]):0;}
+function tkParse(text){
+  var lines=String(text||'').split(/\r?\n/).map(function(l){return l.trim();}).filter(Boolean);
+  var re=/\d{1,3}(?:[.,]\d{3})+[.,]\d{2}(?!\d)|\d+[.,]\d{2}(?!\d)/g;
+  function amts(l){return (l.match(re)||[]).map(tkNum).filter(function(v){return v>0&&v<5000;});}
+  var best=0,bestP=0,all=[];
+  lines.forEach(function(l,i){
+    var n=norm(l),a=amts(l);a.forEach(function(v){all.push(v);});
+    if(/subtotal|sub total|\bbase\b|\biva\b|cuota|descuento|ahorro|entregado|cambio/.test(n))return;
+    var pr=/total a pagar|a pagar|importe total/.test(n)?3:/\btotal\b/.test(n)?2:0;
+    if(!pr)return;
+    if(!a.length&&!/art|unid|prod/.test(n)&&lines[i+1])a=amts(lines[i+1]);
+    if(a.length&&pr>bestP){bestP=pr;best=a[a.length-1];}
+  });
+  if(!best&&all.length)best=Math.max.apply(null,all);
+  var con='';
+  for(var i=0;i<Math.min(7,lines.length);i++){if(/[A-Za-zÁÉÍÓÚÑáéíóúñ]{3,}/.test(lines[i])&&!/^\W*\d/.test(lines[i])){con=lines[i].replace(/[^\wÁÉÍÓÚÑáéíóúñ&.,' -]/g,'').trim().slice(0,40);break;}}
+  var t=norm(text||''),cat='otros';
+  for(var k=0;k<TK_CAT.length;k++){if(TK_CAT[k][1].test(t)){cat=TK_CAT[k][0];break;}}
+  var pay=/tarjeta|visa|mastercard|contactless|credito|debito/.test(t)?'tarjeta':/efectivo|cambio/.test(t)?'efectivo':'tarjeta';
+  return {amt:best,con:con||'Ticket de compra',cat:cat,pay:pay};
+}
+function tkSet(t){var e=$('#tk-st');if(e)e.textContent=t;}
+function tkLib(){return window.Tesseract?Promise.resolve():new Promise(function(ok,ko){var sc=document.createElement('script');sc.src='https://cdn.jsdelivr.net/npm/tesseract.js@6.0.1/dist/tesseract.min.js';sc.onload=ok;sc.onerror=function(){ko(new Error('lib'));};document.head.appendChild(sc);});}
+function tkPrep(file){return new Promise(function(ok,ko){
+  var u=URL.createObjectURL(file),im=new Image();
+  im.onerror=function(){URL.revokeObjectURL(u);ko(new Error('img'));};
+  im.onload=function(){
+    var sc=Math.min(1,2000/Math.max(im.width,im.height)),c=document.createElement('canvas');
+    c.width=Math.round(im.width*sc);c.height=Math.round(im.height*sc);
+    var x=c.getContext('2d');x.drawImage(im,0,0,c.width,c.height);URL.revokeObjectURL(u);
+    try{var d=x.getImageData(0,0,c.width,c.height),q=d.data;
+      for(var i=0;i<q.length;i+=4){var g=0.299*q[i]+0.587*q[i+1]+0.114*q[i+2];g=Math.max(0,Math.min(255,(g-128)*1.5+128));q[i]=q[i+1]=q[i+2]=g;}
+      x.putImageData(d,0,0);}catch(e){}
+    ok(c);};
+  im.src=u;});}
+function tkScan(file){
+  if(!file)return;
+  if(!/^image\//.test(file.type)){toast('Sube una foto o captura del ticket (JPG o PNG)','bad');return;}
+  tk={st:'busy',msg:'Preparando la imagen…'};render();
+  tkLib().then(function(){return tkPrep(file);}).then(function(cv){
+    tkSet('Leyendo el ticket…');
+    return Tesseract.recognize(cv,'spa',{logger:function(m){
+      if(m.status==='recognizing text')tkSet('Leyendo el ticket… '+Math.round(m.progress*100)+' %');
+      else if(/load|initializ/.test(m.status))tkSet('Preparando el lector (la primera vez tarda un poco más)…');}});
+  }).then(function(r){
+    var p=tkParse(r.data.text);tk={st:'ready',amt:p.amt,con:p.con,cat:p.cat,pay:p.pay,raw:r.data.text};render();
+    if(!p.amt)toast('No he podido leer el total: escríbelo tú','bad');
+  }).catch(function(){tk={st:'err'};render();});
+}
+function tkHtml(){
+  if(tk.st==='busy')return '<section class="panel tk"><h2>Escanear ticket</h2><p class="hint" id="tk-st" role="status">'+esc(tk.msg||'')+'</p></section>';
+  if(tk.st==='ready')return '<form class="panel tk" data-form="ticket"><h2>Revisa el ticket</h2>'+
+    '<p class="hint">'+(tk.amt?'He leído un total de <strong class="num">'+eur(tk.amt,2)+'</strong>. Compruébalo con tu ticket antes de restarlo.':'No he encontrado el total. Escríbelo tú.')+'</p>'+
+    '<div class="qa-row">'+
+    '<label class="f"><span>Importe (€)</span><input id="tk-amt" type="number" inputmode="decimal" step="0.01" min="0.01" required value="'+(tk.amt||'')+'"></label>'+
+    '<label class="f"><span>Categoría</span><select id="tk-cat">'+Object.keys(CATS).map(function(k){return '<option value="'+k+'"'+(k===tk.cat?' selected':'')+'>'+CATS[k].l+'</option>';}).join('')+'</select></label>'+
+    '<label class="f grow"><span>Concepto</span><input id="tk-con" type="text" maxlength="40" value="'+esc(tk.con||'')+'"></label>'+
+    '<label class="f"><span>Pago</span><select id="tk-pay"><option value="tarjeta"'+(tk.pay==='tarjeta'?' selected':'')+'>Tarjeta</option><option value="efectivo"'+(tk.pay==='efectivo'?' selected':'')+'>Efectivo</option></select></label>'+
+    '<button class="btn primary" type="submit">Restar de mi dinero</button></div>'+
+    '<div class="row"><button type="button" class="btn sm ghost" data-act="tkOff">Descartar</button></div>'+
+    '<details><summary>Ver el texto que ha leído</summary><pre>'+esc(tk.raw||'')+'</pre></details></form>';
+  return '<section class="panel tk"><h2>Escanear ticket</h2>'+(tk.st==='err'?'<p class="hint">No he podido leer la imagen o cargar el lector (hace falta conexión la primera vez). Prueba otra foto o apunta el gasto a mano.</p>':'')+
+    '<label class="btn primary" for="tk-file">📷 Subir o hacer foto del ticket</label><input id="tk-file" type="file" accept="image/*" hidden>'+
+    '<p class="hint">La foto se lee en tu navegador: no se guarda ni se envía a ningún sitio. Se apunta como gasto de hoy y podrás deshacerlo desde la lista.</p></section>';
 }
 function quickAdd(m){
   var rec=movRecientes(),ing=qaKind==='ingreso';
@@ -1136,14 +1268,15 @@ function quickAdd(m){
   '<button class="btn primary" type="submit">Añadir</button></div>';
   return '<form class="panel" data-form="'+(ing?'ingreso':'gasto')+'"><h2>Apunta un '+(ing?'ingreso':'gasto')+tabs+'</h2>'+form+
   (ing?'<p class="hint">Dinero que te entra además de tus ingresos fijos (un regalo, una clase particular, una propina...). Se suma al presupuesto de este mes.</p>':'')+
-  (rec.length?'<ul class="list">'+rec.map(function(g){var inc=g.k==='i';return '<li><span class="l">'+esc(g.t)+'<small>'+esc(g.s)+' · '+esc(parse(g.fecha).toLocaleDateString('es-ES',{day:'numeric',month:'short'}))+'</small></span><span class="row"><span class="num'+(inc?' ok':'')+'">'+(inc?'+ ':'')+eur(g.v,2)+'</span><button type="button" class="btn sm ghost" data-act="'+(inc?'delIngreso':'delGasto')+'" data-id="'+g.id+'" aria-label="Deshacer '+(inc?'ingreso':'gasto')+'">Deshacer</button></span></li>';}).join('')+'</ul>':'<p class="hint">Todavía no has apuntado movimientos.</p>')+'</form>';
+  (rec.length?'<ul class="list">'+rec.map(function(g){var inc=g.k==='i';return '<li><span class="l">'+esc(g.t)+'<small>'+esc(g.s)+' · '+esc(parse(g.fecha).toLocaleDateString('es-ES',{day:'numeric',month:'short'}))+'</small></span><span class="row"><span class="num'+(inc?' ok':'')+'">'+(inc?'+ ':'')+eur(g.v,2)+'</span><button type="button" class="btn sm ghost" data-act="'+(inc?'delIngreso':'delGasto')+'" data-id="'+g.id+'" aria-label="Deshacer '+(inc?'ingreso':'gasto')+'">Deshacer</button></span></li>';}).join('')+'</ul>':'<p class="hint">Todavía no has apuntado movimientos.</p>')+'</form>'+(ing?'':tkHtml());
 }
 function ingresosHtml(m){
   if(!m.mi.length)return '';
   return '<section class="panel"><h2>Ingresos extra de '+MESES[m.mo]+'<span class="num ok">+ '+eur(m.extra,2)+'</span></h2><ul class="list">'+m.mi.slice().reverse().map(function(i){return '<li><span class="l">'+esc(i.concepto)+'<small>'+esc(INGC[i.tipo]||'Ingreso')+' · '+esc(parse(i.fecha).toLocaleDateString('es-ES',{day:'numeric',month:'short'}))+'</small></span><span class="row"><span class="num ok">+ '+eur(i.importe,2)+'</span><button type="button" class="btn sm ghost" data-act="delIngreso" data-id="'+i.id+'" aria-label="Quitar ingreso">Quitar</button></span></li>';}).join('')+'</ul></section>';
 }
 function chartSpend(m){
-  var W=640,H=250,L=48,R=14,T=16,B=30,pw=W-L-R,ph=H-T-B;
+  if(m.budget<=0)return '<section class="panel"><h2>Cuánto llevas gastado este mes<span class="hint num">'+MESES[m.mo]+'</span></h2><p class="hint">Este mes no tienes dinero disponible, así que no hay gráfica. Llevas gastado '+eur(m.spent,2)+'.</p></section>';
+  var W=640,H=250,L=58,R=14,T=16,B=30,pw=W-L-R,ph=H-T-B;
   var daily=[];for(var i=0;i<=m.n;i++)daily.push(0);
   m.mg.forEach(function(g){daily[+g.fecha.slice(8,10)]+=g.importe;});
   var cum=0,pts=[[0,0]];for(var d=1;d<=m.day;d++){cum+=daily[d];pts.push([d,cum]);}
@@ -1151,18 +1284,19 @@ function chartSpend(m){
   var X=function(d){return L+d/m.n*pw;},Y=function(v){return T+ph-(v/maxV)*ph;};
   var ln=pts.map(function(p,i){return (i?'L':'M')+X(p[0]).toFixed(1)+' '+Y(p[1]).toFixed(1);}).join(' ');
   var ar=ln+' L'+X(m.day).toFixed(1)+' '+Y(0).toFixed(1)+' L'+X(0).toFixed(1)+' '+Y(0).toFixed(1)+' Z';
-  var yt=[0,.5,1].map(function(f){var v=m.budget*f;return '<line x1="'+L+'" x2="'+(W-R)+'" y1="'+Y(v).toFixed(1)+'" y2="'+Y(v).toFixed(1)+'" stroke="var(--line)" stroke-width="1"/><text class="tx" x="'+(L-6)+'" y="'+(Y(v)+4).toFixed(1)+'" text-anchor="end">'+Math.round(v)+'</text>';}).join('');
+  var yt=[0,.5,1].map(function(f){var v=m.budget*f;return '<line x1="'+L+'" x2="'+(W-R)+'" y1="'+Y(v).toFixed(1)+'" y2="'+Y(v).toFixed(1)+'" stroke="var(--line)" stroke-width="1"/><text class="tx" x="'+(L-6)+'" y="'+(Y(v)+4).toFixed(1)+'" text-anchor="end">'+Math.round(v)+' €</text>';}).join('');
   var xs=[1,8,15,22,m.n].filter(function(v,i,a){return v<=m.n&&a.indexOf(v)===i;});
   var xt=xs.map(function(v){return '<text class="tx" x="'+X(v).toFixed(1)+'" y="'+(H-10)+'" text-anchor="middle">'+v+'</text>';}).join('');
   var last=pts[pts.length-1];
-  return '<section class="panel"><h2>Tu mes día a día<span class="hint num">'+MESES[m.mo]+'</span></h2>'+
+  return '<section class="panel"><h2>Cuánto llevas gastado este mes<span class="hint num">'+MESES[m.mo]+'</span></h2>'+
+  '<p class="hint">Hoy (día '+m.day+') llevas gastado <strong class="num">'+eur(m.spent,2)+'</strong> de los <strong class="num">'+eur(m.budget,2)+'</strong> que tienes disponibles. Si repartieras el dinero a partes iguales entre todos los días, a estas alturas llevarías <strong class="num">'+eur(m.ideal,2)+'</strong>: '+(m.spent<=m.ideal?'vas por debajo, ¡bien!':'vas por encima.')+'</p>'+
   '<svg class="ch" viewBox="0 0 '+W+' '+H+'" role="img" aria-label="Gasto acumulado de '+eur(m.spent)+' frente a un presupuesto de '+eur(m.budget)+'">'+yt+xt+
-  '<text class="tx b" x="'+(W-R)+'" y="'+(Y(m.budget)-6).toFixed(1)+'" text-anchor="end">Presupuesto '+eur(m.budget)+'</text>'+
+  '<text class="tx b" x="'+(W-R)+'" y="'+(Y(m.budget)-6).toFixed(1)+'" text-anchor="end">Disponible este mes: '+eur(m.budget)+'</text>'+
   '<path d="'+ar+'" fill="var(--accent-soft)" stroke="none"/>'+
   '<line x1="'+X(0).toFixed(1)+'" y1="'+Y(0).toFixed(1)+'" x2="'+X(m.n).toFixed(1)+'" y2="'+Y(m.budget).toFixed(1)+'" stroke="var(--muted)" stroke-width="2" stroke-dasharray="5 5" fill="none"/>'+
   '<path d="'+ln+'" fill="none" stroke="var(--accent)" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>'+
   '<circle cx="'+X(last[0]).toFixed(1)+'" cy="'+Y(last[1]).toFixed(1)+'" r="5" fill="var(--accent)" stroke="var(--surface)" stroke-width="2"/></svg>'+
-  '<div class="legend"><span><i></i>Lo que llevas gastado</span><span><i class="d"></i>Ritmo ideal para llegar a fin de mes</span><span>Eje horizontal: día del mes</span></div></section>';
+  '<div class="legend"><span><i></i>Línea de color: lo que llevas gastado, sumando día a día</span><span><i class="d"></i>Línea discontinua: lo que llevarías gastado si repartieras todo el dinero por igual</span><span>Abajo: día del mes. A la izquierda: euros.</span></div></section>';
 }
 var PIEC=['#2B6CF0','#0A8F66','#E0A100','#D8381B','#7A3FD1','#E1599B','#13A3B8','#7A8499','#8C5A2B','#4C9A2A','#C2410C','#0F766E','#6D28D9'];
 function catsHtml(m){
@@ -1229,7 +1363,29 @@ function swipeCard(x){
   '<p class="hint"><strong>Plazo:</strong> '+esc(a.plazo)+'</p>'+
   '<details><summary>Cómo pedirla</summary><ol>'+a.pasos.map(function(s){return '<li>'+esc(s)+'</li>';}).join('')+'</ol></details></article>';
 }
+var CAT_EST=['Abierta','Próximamente','Permanente','Cerrada'],CAT_PILL={'Abierta':'ok','Próximamente':'warn','Permanente':'ok','Cerrada':'bad'};
+function catHtml(){
+  var h='<section class="panel" id="catalogo"><h2>Catálogo oficial de becas y ayudas'+(CAT.rows&&CAT.rows.length?'<span class="num">'+CAT.rows.length+'</span>':'')+'</h2>';
+  if(!CL())return h+'<p class="hint">Inicia sesión para ver el catálogo completo de becas y ayudas oficiales, con su plazo y el enlace a la convocatoria.</p></section>';
+  if(CAT.rows===null)return h+'<p class="hint" role="status">Cargando el catálogo…</p></section>';
+  if(CAT.err)return h+'<p class="hint">No he podido cargar el catálogo: '+esc(CAT.err)+'</p><div><button class="btn sm" data-act="catReload">Reintentar</button></div></section>';
+  if(!CAT.rows.length)return h+'<p class="hint">Todavía no hay ayudas en el catálogo.</p></section>';
+  var fl=[['todas','Todas']].concat(CAT_EST.map(function(e){return [e,e];}));
+  var rows=CAT.rows.filter(function(r){return CAT.f==='todas'||r.estado===CAT.f;});
+  h+='<div class="chips" role="group" aria-label="Filtrar el catálogo por estado">'+fl.map(function(f){return '<button class="chip" data-act="catFilter" data-v="'+esc(f[0])+'" aria-pressed="'+(CAT.f===f[0])+'">'+esc(f[1])+'</button>';}).join('')+'</div>';
+  h+='<div class="cat-list">'+(rows.length?rows.map(function(r){
+    var url=/^https:\/\/\S+$/.test(r.enlace_oficial||'')?r.enlace_oficial:'';
+    return '<article class="cat-i"><div class="cat-top"><strong>'+esc(r.titulo)+'</strong><span class="pill '+(CAT_PILL[r.estado]||'warn')+'">'+esc(r.estado)+'</span></div>'+
+      '<div class="cat-meta">'+esc(r.organismo)+' · '+esc(r.ambito)+' · '+esc(r.categoria)+'</div>'+
+      (r.cuantia_maxima?'<div class="num">'+esc(r.cuantia_maxima)+'</div>':'')+
+      (r.plazo?'<div class="cat-meta"><strong>Plazo:</strong> '+esc(r.plazo)+'</div>':'')+
+      (r.requisitos?'<details><summary>Requisitos</summary><p>'+esc(r.requisitos)+'</p></details>':'')+
+      (url?'<div><a href="'+esc(url)+'" target="_blank" rel="noopener noreferrer">Convocatoria oficial</a></div>':'')+'</article>';
+  }).join(''):'<p class="hint">No hay ayudas con ese estado.</p>')+'</div>';
+  return h+'<p class="hint">Cuantías y plazos orientativos: confirma siempre en la convocatoria oficial.</p></section>';
+}
 function vAyudas(){
+  if(CL()&&CAT.rows===null&&!CAT.busy)loadCat();
   var all=matchAll();
   var q=all.filter(function(x){return S.saved.indexOf(x.a.id)<0&&S.discarded.indexOf(x.a.id)<0&&(ayFilter==='todas'||x.a.cat===ayFilter||(ayFilter==='urgentes'&&(x.a.urg||x.a.gratis)));});
   var saved=all.filter(function(x){return S.saved.indexOf(x.a.id)>=0;});
@@ -1242,7 +1398,7 @@ function vAyudas(){
   (q.length?'<div class="decide"><button class="btn danger" data-act="decide" data-v="l">Descartar</button><button class="btn" data-act="undoDecide"'+(S.hist.length?'':' disabled')+'>Deshacer</button><button class="btn primary" data-act="decide" data-v="r">Guardar</button></div><p class="hint" style="text-align:center">'+q.length+' por revisar. Los importes y plazos son orientativos: confirma siempre en la convocatoria oficial.</p>':'')+'</div>'+
   '<div class="col"><section class="panel"><h2>Tus guardadas<span class="num">'+saved.length+'</span></h2>'+
   (saved.length?'<ul class="list">'+saved.map(function(x){return '<li><span class="l"><strong>'+esc(x.a.t)+'</strong><small>'+esc(x.a.imp)+'</small></span><button class="btn sm ghost" data-act="unsave" data-id="'+x.a.id+'">Quitar</button></li>';}).join('')+'</ul>'+(total?'<p class="hint">Valor máximo orientativo al año: <strong class="num">'+eur(total)+'</strong>. Algunas se acumulan y otras no.</p>':'')+'<a class="btn" href="#calendario">Ver fechas en el calendario</a>':'<p class="hint">Guarda las que te interesen y te avisaremos en el calendario.</p>')+'</section>'+
-  '<section class="panel"><h2>Fuentes</h2><p class="hint">Cuantías de la beca MEC según <a href="https://www.xataka.com/basics/becas-mec-2026-2027-cuantias-como-solicitarlas-cuales-requisitos" target="_blank" rel="noopener">Xataka</a>. Requisitos del Bono Alquiler Joven según <a href="https://www.que.es/2026/05/02/bono-alquiler-joven-2026-plazos-requisitos/" target="_blank" rel="noopener">Qué.es</a>. El resto son datos de demostración.</p></section></div></div>';
+  '<section class="panel"><h2>Fuentes</h2><p class="hint">Cuantías de la beca MEC según <a href="https://www.xataka.com/basics/becas-mec-2026-2027-cuantias-como-solicitarlas-cuales-requisitos" target="_blank" rel="noopener">Xataka</a>. Requisitos del Bono Alquiler Joven según <a href="https://www.que.es/2026/05/02/bono-alquiler-joven-2026-plazos-requisitos/" target="_blank" rel="noopener">Qué.es</a>. El resto son datos de demostración.</p></section></div></div>'+catHtml();
 }
 
 /* calendario */
@@ -1283,24 +1439,28 @@ function vRetos(){
     var id='sh-'+r.id;
     return '<div class="row"><label class="f grow"><span>Compartir este reto con un amigo</span><select id="'+id+'"><option value="">Elige un amigo</option>'+cloud.red.amigos.map(function(a){return '<option value="'+esc(a.id)+'">'+esc(a.nombre)+'</option>';}).join('')+'</select></label><button type="button" class="btn sm" data-act="shareApp" data-id="'+r.id+'" data-sel="'+id+'">Compartir</button></div>';
   };
-  var cards=RETOS.map(function(r){
+  var cardsJ=[],cardsA=[];
+  RETOS.forEach(function(r){
     var s=retoStats(r.id),rank='',nT=S.retoHist.filter(function(h){return h.rid===r.id;}).length;
-    if(s){var arr=[{n:'Tú',d:s.days,me:1}].concat(AMIGOS.map(function(a){return {n:a,d:friendDays(a,r)};})).sort(function(a,b){return b.d-a.d;});
-      rank='<details><summary>Clasificación con amigos (ejemplo)</summary><ol class="rank">'+arr.map(function(x,i){return '<li class="'+(x.me?'me':'')+'"><span class="num">'+(i+1)+'</span><span>'+esc(x.n)+'</span><span class="num">'+x.d+'/'+r.dias+' días</span></li>';}).join('')+'</ol></details>';}
-    return '<article class="panel"><div class="row"><span class="chip tag">'+esc(r.c)+'</span><span class="hint num">'+r.dias+' días · '+r.pts+' pts/día</span></div><h3>'+esc(r.t)+'</h3><p class="sc-d">'+esc(r.d)+'</p>'+
+    var locBlock='';
+    if(s){var ko='app:'+r.id,lo=S.locPeople[ko]||{},ll=Object.keys(lo).map(function(n){return {n:n,d:lo[n]};});
+      if(ll.length){var arr=[{n:'Tú',d:s.days,me:1}].concat(ll.map(function(x){return {n:x.n,d:uniqN(x.d)};})).sort(function(a,b){return b.d-a.d;});
+        rank='<ol class="rank">'+arr.map(function(x,i){return '<li class="'+(x.me?'me':'')+'"><span class="num">'+(i+1)+'</span><span>'+esc(x.n)+'</span><span class="num">'+x.d+'/'+r.dias+' días</span></li>';}).join('')+'</ol>';}
+      locBlock=(ll.length?'<div class="row">'+locRows(ko,ll)+'</div>':'')+locForm(ko);}
+    var card='<article class="panel"><div class="row"><span class="chip tag">'+esc(r.c)+'</span><span class="hint num">'+r.dias+' días · '+r.pts+' pts/día</span></div><h3>'+esc(r.t)+'</h3><p class="sc-d">'+esc(r.d)+'</p>'+
     (s?'<div class="meter" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="'+s.pct+'" aria-label="Progreso"><i style="width:'+s.pct+'%"></i></div><p class="hint num">'+s.days+' de '+r.dias+' días · racha '+s.streak+' · ahorro estimado '+eur(s.saved)+'</p>'+
-      '<div class="row"><button class="btn primary sm" data-act="checkin" data-id="'+r.id+'"'+(s.today||s.done?' disabled':'')+'>'+(s.done?'Reto superado':s.today?'Hoy ya está':'Hoy lo he cumplido')+'</button><button class="btn sm ghost" data-act="leave" data-id="'+r.id+'">Salir</button></div>'+rank:
+      '<div class="row"><button class="btn primary sm" data-act="checkin" data-id="'+r.id+'"'+(s.today||s.done?' disabled':'')+'>'+(s.done?'Reto superado':s.today?'Hoy ya está':'Hoy lo he cumplido')+'</button><button class="btn sm ghost" data-act="leave" data-id="'+r.id+'">Salir</button></div>'+rank+locBlock:
       (nT?'<p class="hint">Lo has terminado '+nT+(nT===1?' vez':' veces')+'. Hay una nueva edición disponible.</p>':'')+'<button class="btn primary sm" data-act="join" data-id="'+r.id+'">Unirme al reto</button>')+shareAppHtml(r)+'</article>';
-  }).join('');
+    (s?cardsJ:cardsA).push(card);
+  });
   var myCards=activeMy().map(function(m){
     var st=myStats(m),rk=myRank(m);
     return '<article class="panel"><div class="row"><span class="chip tag">'+(m.shared?'Reto compartido':'Reto propio')+'</span><span class="hint num">'+m.dias+' días · quedan '+st.left+'</span></div><h3>'+esc(m.t)+'</h3>'+(m.d?'<p class="sc-d">'+esc(m.d)+'</p>':'')+
     '<div class="meter" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="'+st.pct+'" aria-label="Progreso"><i style="width:'+st.pct+'%"></i></div><p class="hint num">'+st.days+' de '+m.dias+' días'+(m.est?' · ahorro estimado '+eur(st.saved):'')+'</p>'+
     '<ol class="rank">'+rk.map(function(x,i){return '<li class="'+(x.me?'me':'')+'"><span class="num">'+(i+1)+'</span><span>'+esc(x.n)+'</span><span class="num">'+x.d+'/'+m.dias+' días</span></li>';}).join('')+'</ol>'+
     '<div class="row"><button class="btn primary sm" data-act="myCheck" data-id="'+m.id+'" data-who="Tú"'+(st.today?' disabled':'')+'>'+(st.today?'Hoy ya está':'Hoy lo he cumplido')+'</button>'+
-    (m.shared?'':m.amigos.map(function(a){var dn=(m.p[a]||[]).indexOf(ymd(new Date()))>=0;return '<button class="btn sm" data-act="myCheck" data-id="'+m.id+'" data-who="'+esc(a)+'"'+(dn?' disabled':'')+'>'+esc(a)+(dn?' ✓':' hoy')+'</button>';}).join(''))+
-    '<button class="btn sm ghost danger" data-act="myDel" data-id="'+m.id+'">'+(m.shared&&!m.mine?'Salir':'Borrar')+'</button></div>'+(m.shared?invitarHtml('reto',m.id,['Tú'].concat(m.amigos)):'')+
-    (m.shared?'<p class="hint">Cada integrante marca sus propios días desde su cuenta. Código para unirse: <strong class="num">'+esc(m.code)+'</strong> <button class="btn sm ghost" data-act="copyInvite" data-t="'+esc('Únete a mi reto «'+m.t+'» en STUD€NTIA: entra en Retos → «Unirme con un código» e introduce '+m.code+'. '+location.href.split('#')[0])+'">Copiar invitación</button></p>':'')+'</article>';
+    '<button class="btn sm ghost danger" data-act="myDel" data-id="'+m.id+'">'+(m.shared&&!m.mine?'Salir':'Borrar')+'</button></div>'+(m.shared?invitarHtml('reto',m.id,['Tú'].concat(m.amigos)):'')+(locList(m).length?'<div class="row">'+locRows(m.id,locList(m))+'</div>':'')+locForm(m.id)+
+    (m.shared?'<p class="hint">Cada integrante con cuenta marca sus propios días; los de este móvil se apuntan aquí y solo se guardan en este dispositivo. Código para unirse: <strong class="num">'+esc(m.code)+'</strong> <button class="btn sm ghost" data-act="copyInvite" data-t="'+esc('Únete a mi reto «'+m.t+'» en STUD€NTIA: entra en Retos → «Unirme con un código» e introduce '+m.code+'. '+location.href.split('#')[0])+'">Copiar invitación</button></p>':'')+'</article>';
   }).join('');
   var formReto='<form class="panel" data-form="reto"><h2>Crea tu propio reto con amigos</h2><div class="row">'+
     '<label class="f grow"><span>Nombre del reto</span><input id="rt-t" required maxlength="40" placeholder="Sin Glovo hasta el viernes"></label>'+
@@ -1308,19 +1468,26 @@ function vRetos(){
     '<label class="f"><span>Ahorro estimado por día (€, opcional)</span><input id="rt-e" type="number" min="0" step="0.5" inputmode="decimal" placeholder="0"></label></div>'+
     '<label class="f"><span>Qué hay que hacer</span><input id="rt-d" maxlength="160" placeholder="Cocinar en casa todos los días"></label>'+
     (CL()&&!cloud.retoErr?'<label class="sw"><input id="rt-sh" type="checkbox" checked>Reto compartido: tus amigos se unen con un código y cada uno marca sus propios días</label>':'<p class="hint">'+(CL()?'Para retos compartidos hay que crear las tablas de retos en Supabase (ver retos.sql).':'Inicia sesión en Grupos para crear retos compartidos en los que cada amigo marque sus propios días.')+' Mientras tanto puedes crear un reto en este dispositivo y apuntar tú los días de todos.</p>')+
-    '<label class="f"><span>Amigos que participan (solo si no es compartido; separados por comas)</span><input id="rt-a" maxlength="160" placeholder="Lucía, Marcos, Dani"></label>'+
-    '<div class="row"><button class="btn primary" type="submit">Crear reto</button><span class="hint">En un reto solo de este dispositivo tú apuntas también los días de tus amigos. Al acabar el plazo o completarlo, el reto pasa a finalizados con su clasificación.</span></div></form>';
+    '<label class="f"><span>Amigos que participan (solo si no es compartido; separados por comas)</span><input id="rt-a" maxlength="160" placeholder="Nombres separados por comas"></label>'+
+    '<div class="row"><button class="btn primary" type="submit">Crear reto</button><span class="hint">También puedes añadir a gente que use este mismo móvil desde la tarjeta de cada reto. Al acabar el plazo o completarlo, el reto pasa a finalizados con su clasificación.</span></div></form>';
   var joinForm=(CL()&&!cloud.retoErr)?'<form class="panel" data-form="joinreto"><h2>Unirme con un código<button type="button" class="btn sm ghost" data-act="retoRefresh">Actualizar</button></h2><div class="row"><label class="f grow"><span>Código que te ha pasado tu amigo</span><input id="jr-code" maxlength="12" placeholder="p. ej. 3f9a1c07be"></label><button class="btn primary" type="submit">Unirme</button></div></form>':'';
   var histPanel=S.retoHist.length?'<section class="panel"><h2>Retos finalizados<span class="num">'+S.retoHist.length+'</span></h2><div class="grid">'+S.retoHist.map(function(h){
     return '<article class="panel"><div class="row"><span class="pill '+(h.done?'ok':'warn')+'">'+(h.done?'Finalizado · completado':'Finalizado · sin completar')+'</span><span class="chip tag">'+esc(h.c)+'</span></div><h3>'+esc(h.t)+'</h3>'+
     '<p class="hint num">'+esc(parse(h.start).toLocaleDateString('es-ES',{day:'numeric',month:'short'}))+' → '+esc(parse(h.end).toLocaleDateString('es-ES',{day:'numeric',month:'short'}))+' · '+h.days+' de '+h.dias+' días'+(h.saved?' · ahorro estimado '+eur(h.saved):'')+' · '+h.puntos+' pts</p>'+
-    '<details><summary>Clasificación final'+(h.ejemplo?' (ejemplo)':'')+'</summary><ol class="rank">'+h.rank.map(function(x,i){return '<li class="'+(x.me?'me':'')+'"><span class="num">'+(i+1)+'</span><span>'+esc(x.n)+'</span><span class="num">'+x.d+'/'+h.dias+' días</span></li>';}).join('')+'</ol></details>'+
+    '<details><summary>Clasificación final</summary><ol class="rank">'+h.rank.filter(function(x){return x.me||['Lucía','Marcos','Aitana','Dani'].indexOf(x.n)<0;}).map(function(x,i){return '<li class="'+(x.me?'me':'')+'"><span class="num">'+(i+1)+'</span><span>'+esc(x.n)+'</span><span class="num">'+x.d+'/'+h.dias+' días</span></li>';}).join('')+'</ol></details>'+
     '<div class="row"><button class="btn sm" data-act="repeatReto" data-id="'+h.id+'">Empezar otro igual</button></div></article>';
   }).join('')+'</div></section>':'';
   return '<div><h1>Retos entre amigos</h1><p class="sub">Elige un reto, apunta cada día que lo cumples y compara tu racha con la de tus amigos.</p></div>'+
   '<section class="panel"><div class="lvl"><div><span class="hint">Tu nivel</span><br><strong>'+lv.name+'</strong></div><div style="flex:1 1 220px;min-width:0"><div class="meter" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="'+pct+'" aria-label="Progreso de nivel"><i style="width:'+pct+'%"></i></div><p class="hint num">'+pt+' puntos'+(next?' · '+(next[0]-pt)+' para '+next[1]:' · nivel máximo')+'</p></div><div><span class="hint">Ahorro estimado</span><br><strong class="num">'+eur(savedTot)+'</strong></div></div>'+
-  '<div class="row"><button class="btn" data-act="copyInvite" data-t="'+esc(invite)+'">Copiar invitación para amigos</button><span class="hint">Los amigos de la clasificación son de ejemplo. Sincronizar con amigos reales necesita cuentas y servidor.</span></div></section>'+
-  formReto+joinForm+'<div class="grid">'+myCards+cards+'</div>'+histPanel;
+  '<div class="row"><button class="btn" data-act="copyInvite" data-t="'+esc(invite)+'">Copiar invitación para amigos</button><span class="hint">Para retos con amigos reales, crea un reto compartido y invítales desde Grupos → Amigos.</span></div></section>'+
+  (function(){
+    var nI=nRetosInv(),nMine=activeMy().length+cardsJ.length,nAv=cardsA.length;
+    var jump='<div class="jump">'+(nI?'<button type="button" class="btn sm primary" data-act="goto" data-to="rt-inv">Invitaciones <span class="nb">'+nI+'</span></button>':'')+'<button type="button" class="btn sm" data-act="goto" data-to="rt-mine">Mis retos ('+nMine+')</button><button type="button" class="btn sm" data-act="goto" data-to="rt-avail">Retos disponibles ('+nAv+')</button><button type="button" class="btn sm" data-act="goto" data-to="rt-new">Crear o unirme con código</button></div>';
+    return jump+
+    (nI?'<section class="panel alertp" id="rt-inv"><h2>Te han invitado a '+(nI===1?'un reto':nI+' retos')+'<span class="nb">'+nI+'</span></h2><ul class="list">'+invItems('reto')+'</ul></section>':'')+
+    '<h2 id="rt-mine" style="margin:8px 0 0">Mis retos<span class="num"> '+nMine+'</span></h2>'+(nMine?'<div class="grid">'+myCards+cardsJ.join('')+'</div>':'<p class="hint">Todavía no estás en ningún reto. Únete a uno de los de abajo, crea el tuyo o acepta una invitación.</p>')+
+    '<h2 id="rt-avail" style="margin:8px 0 0">Retos disponibles<span class="num"> '+nAv+'</span></h2>'+(nAv?'<div class="grid">'+cardsA.join('')+'</div>':'<p class="hint">Ya estás en todos los retos de la app.</p>')+
+    '<div id="rt-new" style="display:grid;gap:12px">'+formReto+joinForm+'</div>'+histPanel;})();
 }
 
 /* simulador */
@@ -1457,7 +1624,145 @@ function vOnboard(){
   return '<div class="wrap ob"><div class="steps" aria-hidden="true">'+titles.map(function(_,i){return '<i class="'+(i<=st?'on':'')+'"></i>';}).join('')+'</div><div><p class="hint num">Paso '+(st+1)+' de 5</p><h1 style="font-size:clamp(26px,4vw,36px)">'+titles[st]+'</h1></div>'+body+(d.err?'<p class="err" role="alert">'+esc(d.err)+'</p>':'')+
   '<div class="row">'+(st>0?'<button class="btn" data-act="obBack">Atrás</button>':'<button class="btn ghost" data-act="obCancel">Volver</button>')+(st<4?'<button class="btn primary" data-act="obNext">Siguiente</button>':'<button class="btn primary" data-act="obFinish">Terminar</button>')+'</div></div>';
 }
-var VIEWS={inicio:vInicio,ayudas:vAyudas,calendario:vCalendario,retos:vRetos,grupos:vGrupos,emancipacion:vEmancipacion,planes:vPlanes,asistente:vAsistente};
+
+function vIntereses() {
+  return `<div><h1>Descubre los <span class="hl">Intereses Bancarios</span>.</h1>
+  <p class="sub">Aprende cómo crece tu dinero o cuánto te cuesta pedirlo prestado.</p></div>
+  
+  <div class="cols">
+    <div class="col">
+      <section class="panel">
+        <h2>¿Qué son los intereses bancarios?</h2>
+        <p>El interés es básicamente el <strong>precio del dinero</strong>. Si tú le prestas dinero al banco (al meterlo en una cuenta remunerada o depósito), el banco te paga un porcentaje extra por usarlo. Si el banco te presta dinero a ti (un préstamo o hipoteca), tú le pagas a ellos ese porcentaje extra por dejártelo.</p>
+      </section>
+
+      <section class="panel">
+        <h2>Tipos de interés</h2>
+        <ul class="list">
+          <li>
+            <span class="l"><strong>Interés Simple</strong><small>Solo crece sobre la cantidad inicial</small></span>
+            <span class="pill">Lineal</span>
+          </li>
+        </ul>
+        <p class="hint" style="margin-top: 8px;">El interés se calcula siempre sobre el capital inicial. Si pones 1.000 € al 10% anual, ganarás 100 € cada año, siempre.</p>
+        
+        <ul class="list" style="margin-top: 12px;">
+          <li>
+            <span class="l"><strong>Interés Compuesto</strong><small>Intereses sobre intereses</small></span>
+            <span class="pill ok">Exponencial</span>
+          </li>
+        </ul>
+        <p class="hint" style="margin-top: 8px;">El interés se calcula sobre el capital inicial MÁS los intereses que ya has ganado. Es el responsable de que el dinero crezca como una bola de nieve con el tiempo. Es el modelo más común en finanzas.</p>
+      </section>
+
+      <section class="panel">
+        <h2>Diferencia: Intereses vs. Inversiones</h2>
+        <p>Aunque ambos buscan hacer crecer tu dinero, tienen naturalezas distintas:</p>
+        <ul class="list">
+          <li>
+            <span class="l"><strong>Interés Bancario (Cuentas/Depósitos)</strong><small>Riesgo casi nulo. Rentabilidad fija y conocida (TIN/TAE).</small></span>
+          </li>
+          <li>
+            <span class="l"><strong>Inversiones (Bolsa, Fondos, Inmuebles)</strong><small>Riesgo variable. Rentabilidad no garantizada; puede haber pérdidas, pero el potencial de ganancia a largo plazo es mucho mayor.</small></span>
+          </li>
+        </ul>
+      </section>
+    </div>
+
+    <div class="col">
+      <section class="panel sticky">
+        <h2>Simulador de Intereses</h2>
+        <p class="hint">Descubre cuánto dinero generarás con el tiempo.</p>
+        
+        <div class="form-g">
+          <label class="f">
+            <span>Capital Inicial (€)</span>
+            <input type="number" id="sim-cap" value="1000" min="1" step="100">
+          </label>
+          <label class="f">
+            <span>Tipo de interés anual (%)</span>
+            <input type="number" id="sim-rate" value="5" min="0.1" step="0.1">
+          </label>
+        </div>
+        
+        <div class="form-g">
+          <label class="f">
+            <span>Plazo (Años)</span>
+            <input type="number" id="sim-years" value="10" min="1" step="1">
+          </label>
+          <label class="f">
+            <span>Tipo de cálculo</span>
+            <select id="sim-type">
+              <option value="compuesto">Compuesto</option>
+              <option value="simple">Simple</option>
+            </select>
+          </label>
+        </div>
+
+        <div style="border-top: 1px solid var(--line); margin-top: 12px; padding-top: 16px;">
+          <h3 style="margin-bottom: 12px;">Resultados</h3>
+          <ul class="list">
+            <li>
+              <span class="l">Capital invertido</span>
+              <span class="num" id="res-cap">1.000,00 €</span>
+            </li>
+            <li>
+              <span class="l">Intereses generados</span>
+              <span class="num ok" id="res-int">+ 628,89 €</span>
+            </li>
+            <li style="border-top: 1px dashed var(--line); margin-top: 4px;">
+              <span class="l"><strong>Total final</strong></span>
+              <span class="num" style="font-size: 18px; font-weight: 600;" id="res-tot">1.628,89 €</span>
+            </li>
+          </ul>
+
+          <div class="stack" role="img" aria-label="Proporción de ganancias">
+            <i class="a" id="bar-cap" style="width: 61.4%;"></i>
+            <i class="b" id="bar-int" style="width: 38.6%;"></i>
+          </div>
+          <div class="legend">
+            <span><i style="background:var(--accent)"></i>Capital</span>
+            <span><i style="background:var(--ok)"></i>Intereses</span>
+          </div>
+        </div>
+      </section>
+    </div>
+  </div>`;
+}
+
+function calculateIntereses() {
+  var capInput = document.getElementById('sim-cap');
+  if (!capInput) return;
+  var cap = parseFloat(capInput.value) || 0;
+  var rate = parseFloat(document.getElementById('sim-rate').value) || 0;
+  var years = parseFloat(document.getElementById('sim-years').value) || 0;
+  var type = document.getElementById('sim-type').value;
+
+  var total = 0;
+  var interest = 0;
+
+  if (type === 'simple') {
+    interest = cap * (rate / 100) * years;
+    total = cap + interest;
+  } else {
+    total = cap * Math.pow((1 + (rate / 100)), years);
+    interest = total - cap;
+  }
+
+  var fmt = new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' });
+
+  document.getElementById('res-cap').textContent = fmt.format(cap);
+  document.getElementById('res-int').textContent = '+' + fmt.format(interest);
+  document.getElementById('res-tot').textContent = fmt.format(total);
+
+  var capPct = total > 0 ? (cap / total) * 100 : 0;
+  var intPct = total > 0 ? (interest / total) * 100 : 0;
+
+  document.getElementById('bar-cap').style.width = capPct + '%';
+  document.getElementById('bar-int').style.width = intPct + '%';
+}
+
+var VIEWS={inicio:vInicio,ayudas:vAyudas,calendario:vCalendario,retos:vRetos,grupos:vGrupos,emancipacion:vEmancipacion,planes:vPlanes,asistente:vAsistente,intereses:vIntereses};
 
 /* ---------- SOS ---------- */
 function openSOS(){
@@ -1489,15 +1794,18 @@ function render(keep){
     if(closeMonths()){save();}
     var nFin=closeRetos();if(nFin){save();setTimeout(function(){toast(nFin===1?'Un reto ha finalizado. Lo tienes en «Retos finalizados» y puedes empezar otro':nFin+' retos han finalizado','ok');},50);}
     checkAlerts(false);
+    try{var nt=nGrupos()+nRetosInv();document.title=(nt?'('+nt+') ':'')+'STUD€NTIA';}catch(e){}
     if(S.flags.newMonth){delete S.flags.newMonth;save();setTimeout(function(){toast('Nuevo mes: vuelves a modo Normal'+(carryNow()>0?' y lo que te sobró se suma a tu presupuesto':''),'ok');},50);}
   }
   if(!S.profile){app.dataset.mode='normal';app.innerHTML=D?vOnboard():vWelcome();if(keep===false)window.scrollTo(0,0);else window.scrollTo(0,y);return;}
   app.dataset.mode=S.mode;
-  app.innerHTML='<header class="top"><div class="wrap topin"><a class="brand" href="#inicio">STUD<span class="hl">€</span>NTIA</a><div class="seg" role="group" aria-label="Modo de gasto">'+Object.keys(MODES).map(function(k){return '<button class="seg-b" data-act="mode" data-v="'+k+'" aria-pressed="'+(S.mode===k)+'">'+MODES[k].l+'</button>';}).join('')+'</div></div><nav class="wrap tabs" aria-label="Secciones">'+TABS.map(function(t){return '<a class="tab" href="#'+t[0]+'" aria-current="'+(view===t[0]?'page':'false')+'">'+t[1]+(t[0]==='grupos'&&redOk()&&(cloud.red.invitaciones.length+cloud.red.recibidas.length)?' <span class="pill bad num">'+(cloud.red.invitaciones.length+cloud.red.recibidas.length)+'</span>':'')+'</a>';}).join('')+'</nav></header>'+
+  app.innerHTML='<header class="top"><div class="wrap topin"><a class="brand" href="#inicio">STUD<span class="hl">€</span>NTIA</a><div class="seg" role="group" aria-label="Modo de gasto">'+Object.keys(MODES).map(function(k){return '<button class="seg-b" data-act="mode" data-v="'+k+'" aria-pressed="'+(S.mode===k)+'">'+MODES[k].l+'</button>';}).join('')+'</div></div><nav class="wrap tabs" aria-label="Secciones">'+TABS.map(function(t){return '<a class="tab" href="#'+t[0]+'" aria-current="'+(view===t[0]?'page':'false')+'">'+t[1]+nbadge(t[0])+'</a>';}).join('')+'</nav></header>'+
   '<main class="wrap main" id="main">'+VIEWS[view]()+'</main>'+
   '<footer class="foot"><div class="wrap"><p>STUD€NTIA es un prototipo. La tarjeta, los amigos y las ayudas son simulaciones o datos de demostración. '+(CL()?'Sesión: '+esc(cloud.user.email||'')+'. Tus datos se guardan en tu cuenta.':'Tus datos se guardan solo en este navegador. Crea una cuenta al inicio para guardarlos en la nube.')+'</p>'+(CL()?'<button class="btn sm ghost" data-act="signout">Cerrar sesión</button> ':'')+'<button class="btn sm ghost" data-act="reset">'+(resetArmed?'¿Seguro? Pulsa otra vez para borrar':'Borrar mis datos')+'</button></div></footer>';
   if(keep===false)window.scrollTo(0,0);else window.scrollTo(0,y);
   var c=$('#chatlog');if(c)c.scrollTop=c.scrollHeight;
+  if(view==='intereses')setTimeout(calculateIntereses,50);
+
 }
 
 /* ---------- acciones ---------- */
@@ -1517,10 +1825,13 @@ var ACT={
   sosGo:function(el){ayFilter=el.dataset.v;closeSOS();},
   sosActivate:function(){setSOS(true,false);closeSOS();render();toast('Modo Fin de mes (SOS) activado','bad');say('He activado el **modo Fin de mes (SOS)** hasta final de mes. Te avisaré si gastas en cosas no esenciales.',true);},
   toggleCard:function(){S.card.blocked=!S.card.blocked;save();render();toast(S.card.blocked?'Tarjeta bloqueada (simulación)':'Tarjeta desbloqueada (simulación)');},
+  tkOff:function(){tk={st:'idle'};render();},
   qaKind:function(el){qaKind=el.dataset.v;render();var i=$(qaKind==='ingreso'?'#qi-amt':'#qa-amt');if(i)i.focus();},
   delIngreso:function(el){S.ingExtra=S.ingExtra.filter(function(i){return i.id!==el.dataset.id;});save();render();toast('Ingreso quitado','ok');},
   delGasto:function(el){S.gastos=S.gastos.filter(function(g){return g.id!==el.dataset.id;});save();render();},
   ayFilter:function(el){ayFilter=el.dataset.v;render();},
+  catFilter:function(el){CAT.f=el.dataset.v;render();},
+  catReload:function(){CAT.rows=null;CAT.err='';render();},
   decide:function(el){decide(el.dataset.v);},
   undoDecide:function(){var h=S.hist.pop();if(!h)return;S.saved=S.saved.filter(function(i){return i!==h;});S.discarded=S.discarded.filter(function(i){return i!==h;});save();render();},
   resetDisc:function(){S.discarded=[];save();render();},
@@ -1539,13 +1850,19 @@ var ACT={
       var mm=await sb.from('reto_miembros').insert({reto_id:ins.data.id,nombre:S.profile.nombre});if(mm.error)return mm;
       return sb.rpc('invitar_amigo',{tipo:'reto',ref:ins.data.id,amigo:fr});
     },'Reto compartido: tu amigo recibirá la invitación y decidirá si entra');},
-  invResp:function(el){var ok=el.dataset.v==='1';cloudDo(function(){return sb.rpc('responder_invitacion',{inv:el.dataset.id,aceptar:ok,mi_nombre:S.profile.nombre});},ok?'Te has unido':'Invitación rechazada');},
+  invResp:function(el){var ok=el.dataset.v==='1';cloudDo(async function(){var r=await sb.rpc('responder_invitacion',{inv:el.dataset.id,aceptar:ok,mi_nombre:S.profile.nombre});if(r.error)return r;if(r.data==='caducada'){await cloudLoad();render();toast('Esa invitación ha caducado: el reto o el grupo ya no existe','bad');return {};}return r;},ok?'Te has unido':'Invitación rechazada');},
   amResp:function(el){var ok=el.dataset.v==='1';cloudDo(function(){return sb.rpc('responder_amistad',{aid:el.dataset.id,aceptar:ok});},ok?'Ya sois amigos':'Solicitud rechazada');},
   amDel:function(el){cloudDo(function(){return sb.rpc('quitar_amigo',{otro:el.dataset.id});},'Amigo quitado');},
   myCheck:function(el){
     var m=activeMy().filter(function(x){return x.id===el.dataset.id;})[0];if(!m)return;var w=el.dataset.who,k=ymd(new Date());
     if(m.shared){if((m.p['Tú']||[]).indexOf(k)>=0)return;cloudDo(function(){return sb.from('reto_checks').insert({reto_id:m.id,user_id:cloud.user.id,fecha:k});},'Hoy apuntado');return;}
     m.p[w]=m.p[w]||[];if(m.p[w].indexOf(k)<0)m.p[w].push(k);save();render();toast(w==='Tú'?'Hoy apuntado':'Día apuntado a '+w,'ok');},
+  locCheck:function(el){var k=el.dataset.k,w=el.dataset.who,t=ymd(new Date()),m=activeMy().filter(function(x){return x.id===k;})[0],arr;
+    if(m&&!m.shared){arr=m.p[w]=m.p[w]||[];}else{var o=S.locPeople[k]=S.locPeople[k]||{};arr=o[w]=o[w]||[];}
+    if(arr.indexOf(t)<0)arr.push(t);save();render();toast('Día apuntado a '+w,'ok');},
+  locDel:function(el){var k=el.dataset.k,w=el.dataset.who,m=activeMy().filter(function(x){return x.id===k;})[0];
+    if(m&&!m.shared){m.amigos=m.amigos.filter(function(n){return n!==w;});delete m.p[w];}else if(S.locPeople[k]){delete S.locPeople[k][w];}
+    save();render();toast(w+' quitado del reto','ok');},
   myDel:function(el){
     var m=activeMy().filter(function(x){return x.id===el.dataset.id;})[0];
     if(m&&m.shared){cloudDo(function(){return m.mine?sb.from('retos').delete().eq('id',m.id):sb.from('reto_miembros').delete().eq('reto_id',m.id).eq('user_id',cloud.user.id);},m.mine?'Reto borrado':'Has salido del reto');return;}
@@ -1556,8 +1873,9 @@ var ACT={
     if(h.custom){var p={'Tú':[]};h.amigos.forEach(function(a){p[a]=[];});S.myRetos.push({id:uid(),t:h.t,d:h.d,dias:h.dias,est:h.est||0,start:ymd(new Date()),amigos:h.amigos.slice(),p:p});}
     else if(!S.joined[h.rid])S.joined[h.rid]={start:ymd(new Date()),checks:[]};
     save();render();toast('Nuevo reto empezado','ok');},
-  leave:function(el){delete S.joined[el.dataset.id];save();render();},
+  leave:function(el){delete S.joined[el.dataset.id];delete S.locPeople['app:'+el.dataset.id];save();render();},
   checkin:function(el){var j=S.joined[el.dataset.id],k=ymd(new Date());if(j.checks.indexOf(k)<0)j.checks.push(k);save();var s=retoStats(el.dataset.id);render();toast(s.done?'Reto superado. +50 puntos':'Racha de '+s.streak+(s.streak===1?' día':' días'),'ok');},
+  goto:function(el){var t=$('#'+el.dataset.to);if(t)t.scrollIntoView({behavior:'smooth',block:'start'});},
   copyInvite:function(el){copy(el.dataset.t,'Invitación copiada');},
   simPlan:function(){var d=objDef('piso'),nm='Independizarme de alquiler',q=S.misPlanes.filter(function(x){return x.nombre===nm;})[0];if(!q){q={id:uid(),nombre:nm,target:0,saved:0,months:12,aporte:0};S.misPlanes.push(q);}q.target=d.def();save();location.hash='#planes';toast('Plan para independizarte creado: ajústalo a tu gusto','ok');},
   planOn:function(el){var d=PLANES.filter(function(p){return p.id===el.dataset.id;})[0],i=planInfo(d),cur=S.plans[d.id]||{};S.plans[d.id]=Object.assign(cur,{on:true,target:i.target,months:i.months,saved:i.saved});save();render();toast('Plan activado: '+eur(i.monthly)+' al mes','ok');},
@@ -1568,7 +1886,6 @@ var ACT={
   signup:function(){cloudAuth('up',$('#au-mail').value.trim(),$('#au-pass').value);},
   signout:async function(){if(CL()&&S.profile&&!S.example){clearTimeout(pushT);var okp=await pushProfileNow();if(!okp){toast('No cierro la sesión: tu perfil todavía no está guardado en la nube','bad');return;}}sb.auth.signOut().then(function(){clearTimeout(pushT);cloud.user=null;cloud.groups=[];cloud.retos=[];cloud.red={codigo:'',amigos:[],recibidas:[],enviadas:[],invitaciones:[]};S=defaults();D=null;mem=null;try{localStorage.removeItem(KEY);}catch(e){}location.hash='';render(false);toast('Sesión cerrada','ok');});},
   gSel:function(el){gSel=el.dataset.id;render();},
-  gExample:function(){var g=gExample();S.groups.push(g);gSel=g.id;save();render();toast('Grupo de ejemplo creado','ok');},
   gDel:function(el){if(CL()){cloudDo(function(){return sb.from('grupos').delete().eq('id',el.dataset.id);});return;}S.groups=S.groups.filter(function(x){return x.id!==el.dataset.id;});save();render();},
   gExpDel:function(el){if(CL()){cloudDo(function(){return sb.from('grupo_gastos').delete().eq('id',el.dataset.id);});return;}var g=S.groups.filter(function(x){return x.id===el.dataset.g;})[0];if(g){g.exp=g.exp.filter(function(e){return e.id!==el.dataset.id;});save();render();}},
   settle:function(el){if(CL()){var cg=cloud.groups.filter(function(x){return x.id===el.dataset.g;})[0];if(cg)cloudDo(function(){return sb.from('grupo_pagos').insert({grupo_id:cg.id,de_id:cg.ids[el.dataset.from],a_id:cg.ids[el.dataset.to],importe_cents:+el.dataset.c});},'Pago apuntado');return;}var g=S.groups.filter(function(x){return x.id===el.dataset.g;})[0];if(g){g.paid.push({from:el.dataset.from,to:el.dataset.to,amt:(+el.dataset.c)/100});save();render();toast('Pago apuntado','ok');}},
@@ -1650,7 +1967,17 @@ document.addEventListener('submit',function(e){
   var f=e.target.closest('form[data-form]');if(!f)return;e.preventDefault();
   var k=f.dataset.form;
   if(k==='gasto'){var a=num($('#qa-amt').value);if(!a){toast('Escribe un importe mayor que cero','bad');return;}addGasto(a,$('#qa-cat').value,$('#qa-con').value.trim(),$('#qa-pay').value);}
+  if(k==='ticket'){var ta=num($('#tk-amt').value);if(!ta){toast('Escribe un importe mayor que cero','bad');return;}var tp=$('#tk-pay').value;if(!(S.card.blocked&&tp==='tarjeta'))tk={st:'idle'};addGasto(ta,$('#tk-cat').value,$('#tk-con').value.trim().slice(0,40),tp);return;}
   if(k==='ingreso'){var ia=num($('#qi-amt').value);if(!ia){toast('Escribe un importe mayor que cero','bad');return;}addIngreso(ia,$('#qi-tipo').value,$('#qi-con').value.trim());}
+  if(k==='saldo'){var sv=num(new FormData(f).get('v')),pp=S.profile,sd=sv-(+pp.saldo||0);pp.saldo=sv;
+    Object.keys(S.closed||{}).forEach(function(c){var x=S.closed[c];x.carryIn=Math.round(((x.carryIn||0)+sd)*100)/100;x.out=Math.round(((x.out||0)+sd)*100)/100;});
+    save();render();toast('Dinero en cuenta actualizado','ok');return;}
+  if(k==='locadd'){var lk=f.dataset.k,ln=String(new FormData(f).get('n')||'').trim().slice(0,20),lm=activeMy().filter(function(x){return x.id===lk;})[0];
+    if(!ln){toast('Escribe un nombre','bad');return;}
+    var lt=(ln.toLowerCase()==='tú'||ln.toLowerCase()==='tu')||(lm&&lm.shared&&lm.amigos.indexOf(ln)>=0)||(lm&&!lm.shared&&lm.amigos.indexOf(ln)>=0)||(S.locPeople[lk]&&S.locPeople[lk][ln]);
+    if(lt){toast('Ya hay alguien con ese nombre en este reto','bad');return;}
+    if(lm&&!lm.shared){lm.amigos.push(ln);lm.p[ln]=[];}else{(S.locPeople[lk]=S.locPeople[lk]||{})[ln]=[];}
+    save();render();toast(ln+' añadido al reto','ok');return;}
   if(k==='reto'){var rt=$('#rt-t').value.trim().slice(0,40),rd=parseInt($('#rt-n').value,10);if(!rt){toast('Ponle un nombre al reto','bad');return;}if(!(rd>=1&&rd<=365)){toast('La duración va de 1 a 365 días','bad');return;}
     if($('#rt-sh')&&$('#rt-sh').checked){cloudNewReto(rt,$('#rt-d').value.trim().slice(0,160),rd,num($('#rt-e').value));return;}
     var am=[];$('#rt-a').value.split(',').forEach(function(x){x=x.trim().slice(0,20);if(x&&x!=='Tú'&&am.indexOf(x)<0&&am.length<8)am.push(x);});
@@ -1676,9 +2003,14 @@ function onInput(e){
     save();$('#mi-out').innerHTML=adviceHtml();}}
   if(el.dataset.sim){var s=simInit(),k=el.dataset.sim;if(k==='bono')s.bono=el.checked;else if(k==='tipo'){s.tipo=el.value;s.tope=el.value==='habitacion'?300:600;var tp=$('#sm-tope');if(tp)tp.value=s.tope;}else if(k==='n'){s.n=+el.value;$('#sm-n-o').textContent=s.n;}else s[k]=num(el.value);save();$('#sim-out').innerHTML=simOut();}
 }
-document.addEventListener('input',onInput);
+document.addEventListener('input',function(e){onInput(e); var el=e.target;
+  if(el.id==='sim-cap'||el.id==='sim-rate'||el.id==='sim-years'){calculateIntereses();}
+});
 document.addEventListener('change',function(e){
   var el=e.target;
+  
+  if(el.id==='sim-type'){calculateIntereses();}
+  if(el.id==='tk-file'){var fl=el.files&&el.files[0];el.value='';tkScan(fl);return;}
   if(el.dataset.bind){setPath(S,el.dataset.bind,el.checked);save();render();}
   if(el.dataset.plan){var d=PLANES.filter(function(p){return p.id===el.dataset.plan;})[0],i=planInfo(d),st=S.plans[d.id]||{on:false,target:i.target,months:i.months,saved:i.saved},k=el.dataset.k;st[k]=num(el.value);S.plans[d.id]=st;if(k==='precio')st.target=d.def();if(k==='months'&&S.profile.objetivo===d.id)S.profile.plazo=st.months;save();render();}
   if(el.dataset.d&&el.tagName==='SELECT'&&D){var wasUni=isUni(D.estudios);setPath(D,el.dataset.d,el.value);if(el.dataset.d==='ccaa'){if(isUni(D.estudios)){D.centro='';D.ambito='';}D.err='';render();}else if(el.dataset.d==='centro'){D.err='';render();}else if(el.dataset.d==='estudios'){if(wasUni!==isUni(D.estudios)){D.centro='';D.ambito='';}D.err='';render();}}
@@ -1704,6 +2036,22 @@ function endDrag(){
 }
 document.addEventListener('pointerup',endDrag);
 document.addEventListener('pointercancel',endDrag);
+
+/* ---------- avisos: mira cada 30 s si te han invitado a algo ---------- */
+var redSig='';
+function redSign(){return redOk()?cloud.red.recibidas.length+'|'+cloud.red.invitaciones.map(function(i){return i.id;}).join(','):'';}
+async function pollRed(){
+  if(!CL()||document.hidden)return;
+  redSig=redSign();var prevN=nGrupos()+nRetosInv();
+  await cloudLoadRed();
+  if(redSign()===redSig)return;
+  var ae=document.activeElement,typing=ae&&/^(INPUT|SELECT|TEXTAREA)$/.test(ae.tagName);
+  if(typing){$$('.tab').forEach(function(a){var v=(a.getAttribute('href')||'').slice(1),old=a.querySelector('.nb');if(old)old.remove();var h=nbadge(v);if(h)a.insertAdjacentHTML('beforeend',h);});}
+  else render();
+  var n=nGrupos()+nRetosInv();if(n>prevN)toast('Tienes '+n+(n===1?' notificación nueva':' notificaciones nuevas')+' (invitaciones o solicitudes)','ok');
+}
+setInterval(pollRed,30000);
+document.addEventListener('visibilitychange',function(){if(!document.hidden)pollRed();});
 
 /* ---------- arranque ---------- */
 if(S.profile)digest();

@@ -162,5 +162,12 @@ do $$ begin
   end if;
 end $$;
 
+-- El catálogo de becas (becas_ayudas.sql) es de solo lectura con sesión: se le devuelve su permiso
+do $$ begin
+  if to_regclass('public.becas_ayudas') is not null then
+    grant select on public.becas_ayudas to authenticated;
+  end if;
+end $$;
+
 -- 7) Que PostgREST (la API) vea los cambios al momento
 notify pgrst, 'reload schema';

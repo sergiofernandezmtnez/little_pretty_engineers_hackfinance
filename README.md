@@ -42,6 +42,16 @@ Las órdenes con efecto (bloquear tarjeta, recordatorios, Modo Supervivencia) si
 
 
 ## Seguridad de la base de datos
-Orden de ejecución en Supabase (SQL Editor): `sql/schema.sql` → `sql/migracion.sql` → `sql/retos.sql` → `sql/amigos.sql` → **`sql/seguridad.sql`**.
+Orden de ejecución en Supabase (SQL Editor): `sql/schema.sql` → `sql/migracion.sql` → `sql/retos.sql` → `sql/amigos.sql` → `sql/becas_ayudas.sql` → **`sql/seguridad.sql`**.
 Después ejecuta `sql/verificar_seguridad.sql`: todas las filas deben decir `OK`. `seguridad.sql` se puede repetir siempre que cambies algo.
 Regla de oro: toda tabla nueva necesita RLS y una política (`enable row level security` + `create policy`) antes de usarse.
+
+## Catálogo de becas y ayudas (CSV → Supabase)
+Los datos viven en **`datos/becas_y_ayudas.csv`** (una fila por ayuda; columnas: `id, titulo, organismo, categoria, cuantia_maxima, requisitos, plazo, estado, ambito, enlace_oficial`). `estado` solo admite `Abierta`, `Próximamente`, `Permanente` o `Cerrada`, y los enlaces deben empezar por `https://`.
+
+Para añadir o cambiar ayudas:
+1. Edita el CSV (Excel vale: guarda como *CSV UTF-8*).
+2. Ejecuta `python scripts/csv_a_sql.py`. Valida el CSV (dice la fila y el motivo si algo falla) y reescribe solo el bloque de datos de `sql/becas_ayudas.sql`.
+3. Pega `sql/becas_ayudas.sql` en Supabase (*SQL Editor → Run*). Se puede repetir sin duplicar: actualiza lo que cambie y borra lo que ya no esté en el CSV.
+
+La app lo muestra en **Ayudas → Catálogo oficial** (solo con sesión iniciada). La tabla `becas_ayudas` es de solo lectura para los usuarios, con RLS, sin acceso para `anon` y con límites de longitud; nadie puede modificarla desde la app o la API, solo desde el SQL Editor. Plazos y cuantías son orientativos: verifícalos en la convocatoria oficial.
