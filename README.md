@@ -30,10 +30,10 @@
 | **Mensajes** | Recordatorios amables entre amigos; la IA revisa que el mensaje sea respetuoso y trate de dinero |
 | **Emancipación** | Simulación de si te salen las cuentas para independizarte |
 | **Planes** | Planes de ahorro con objetivo y aportación mensual |
-| **Asistente** | Chat con Claude. Sin sesión iniciada, funciona un asistente básico por reglas |
+| **Asistente** | Chat con Claude. Con sesión, cada respuesta se puede **escuchar en voz alta** con una voz generada por IA (ElevenLabs). Sin sesión iniciada, funciona un asistente básico por reglas |
 | **Intereses** | Explicación del interés simple y compuesto y de la diferencia con invertir |
 
-**Tecnología:** una sola página (`index.html`, HTML + CSS + JavaScript, sin paso de compilación) · [Supabase](https://supabase.com) (autenticación, PostgreSQL con RLS y Edge Functions) · API de Claude (Anthropic).
+**Tecnología:** una sola página (`index.html`, HTML + CSS + JavaScript, sin paso de compilación) · [Supabase](https://supabase.com) (autenticación, PostgreSQL con RLS y Edge Functions) · API de Claude (Anthropic) · API de texto a voz de [ElevenLabs](https://elevenlabs.io) (voz del asistente).
 
 **Dos modos de uso:** sin configurar nada funciona en **modo local** (los datos se guardan en el navegador). Con cuenta, los datos se guardan en la nube y los grupos, retos y mensajes se comparten entre usuarios.
 
@@ -49,6 +49,7 @@
 |---|---|---|
 | Cuenta de [Supabase](https://supabase.com) (plan gratuito) | Cuentas de usuario, base de datos y función del chat | Solo para la nube |
 | Clave de API de [Anthropic](https://console.anthropic.com) | Asistente con Claude y moderación de mensajes | Solo para el chat con IA |
+| Cuenta de [ElevenLabs](https://elevenlabs.io): clave de API e ID de una voz | Voz del asistente (texto a voz) | Solo para la voz con IA |
 | [Git](https://git-scm.com) | Clonar el repositorio | No (vale el ZIP) |
 | [Python](https://www.python.org) 3.10+ | `server.py` (chat en local) y `scripts/csv_a_sql.py` | No |
 | [Node.js](https://nodejs.org) 18+ | Servidor de desarrollo y build con Vite | No |
@@ -112,9 +113,23 @@ supabase functions deploy chat --no-verify-jwt
 ```
 (La función comprueba por sí misma que quien escribe tiene la sesión iniciada, por eso se publica con `--no-verify-jwt`.)
 
-**Publicación automática (opcional):** el repositorio incluye dos workflows de GitHub Actions. `deploy-web.yml` publica la web en GitHub Pages en cada push a `main`. `deploy-function.yml` vuelve a publicar la función cuando cambia `supabase/functions/**` y necesita el secreto `SUPABASE_ACCESS_TOKEN` en *Settings → Secrets and variables → Actions*; edita en ese archivo el `PROJECT_REF` para que apunte a tu proyecto.
+**Publicación automática (opcional):** el repositorio incluye dos workflows de GitHub Actions. `deploy-web.yml` publica la web en GitHub Pages en cada push a `main`. `deploy-function.yml` vuelve a publicar las funciones `chat` y `tts` cuando cambia `supabase/functions/**` y necesita el secreto `SUPABASE_ACCESS_TOKEN` en *Settings → Secrets and variables → Actions*; edita en ese archivo el `PROJECT_REF` para que apunte a tu proyecto.
 
-### 4.4 Catálogo de becas y ayudas (CSV → Supabase)
+### 4.4 Voz del asistente (ElevenLabs)
+Las respuestas del asistente se pueden escuchar con una **voz generada por IA**: un **clon de la voz de Adri** (Adrián González, del equipo), creado con su consentimiento con *Instant Voice Clone* de ElevenLabs. La función `supabase/functions/tts` hace de puente: comprueba la sesión, limita el uso y llama a ElevenLabs. La clave **nunca** llega al navegador.
+
+1. En [elevenlabs.io](https://elevenlabs.io), crea una clave de API y copia el **ID de la voz** (en *Voices*, abre la voz y copia su ID).
+2. Guárdalos como secretos de Supabase y publica la función:
+   ```bash
+   supabase secrets set ELEVENLABS_API_KEY=tu_clave ELEVENLABS_VOICE_ID=id_de_la_voz
+   supabase functions deploy tts --no-verify-jwt
+   ```
+   Si ya los tienes en `.env`, también vale `supabase secrets set --env-file .env`. Para usar la voz con `server.py`, basta con tenerlos en `.env` (ver `.env.example`).
+3. Opcional: `ELEVENLABS_MODEL` (por defecto `eleven_flash_v2_5`, el de menor latencia; `eleven_multilingual_v2` suena algo mejor pero tarda más) y los ajustes de voz `ELEVENLABS_STABILITY` (0,5) y `ELEVENLABS_SIMILARITY_BOOST` (0,75), entre 0 y 1.
+
+**Consumo:** cada audio gasta créditos de ElevenLabs según su número de caracteres. Para ahorrar, la app recorta cada respuesta a unos 600 caracteres y guarda en memoria los últimos 20 audios, y la función admite como mucho 20 audios cada 10 minutos por usuario. Si la voz de IA falla (sin créditos, sin red, límite superado o más de 15 s de espera), la app lee la respuesta con la voz del navegador y lo indica.
+
+### 4.5 Catálogo de becas y ayudas (CSV → Supabase)
 Los datos viven en **`datos/becas_y_ayudas.csv`** (columnas: `id, titulo, organismo, categoria, cuantia_maxima, requisitos, plazo, estado, ambito, enlace_oficial`). `estado` solo admite `Abierta`, `Próximamente`, `Permanente` o `Cerrada`, y los enlaces deben empezar por `https://`.
 
 Para añadir o cambiar ayudas:
@@ -139,11 +154,11 @@ python -m http.server 8000
 npm run dev      # abre la URL que muestra (normalmente http://localhost:5173)
 ```
 
-**Opción C: chat con IA ejecutándose en tu ordenador** (en lugar de la Edge Function). Necesita `ANTHROPIC_API_KEY` en `.env`:
+**Opción C: chat con IA ejecutándose en tu ordenador** (en lugar de las Edge Functions). Necesita `ANTHROPIC_API_KEY` en `.env` y, para la voz, `ELEVENLABS_API_KEY` y `ELEVENLABS_VOICE_ID`:
 ```bash
-python server.py     # escucha en http://127.0.0.1:5000/chat
+python server.py     # escucha en http://127.0.0.1:5000/chat y http://127.0.0.1:5000/tts
 ```
-Al abrir la app desde `localhost` o `file://`, el asistente prueba primero ese servidor y, si no está, usa la función de Supabase. Sigue siendo necesario iniciar sesión.
+Al abrir la app desde `localhost` o `file://`, el asistente y la voz prueban primero ese servidor y, si no está, usan las funciones de Supabase. Sigue siendo necesario iniciar sesión.
 
 **Opción D: versión publicada.** <https://studentia-eta.vercel.app> (se despliega sola con cada push a `main`).
 
@@ -156,7 +171,7 @@ Al abrir la app desde `localhost` o `file://`, el asistente prueba primero ese s
 2. Pulsa **Ver con un perfil de ejemplo**. Aparece el aviso "Estás viendo un perfil de ejemplo".
 3. En **Inicio** comprueba que ves tu presupuesto del mes y cuánto puedes gastar hoy.
 4. Recorre las pestañas (Ayudas, Calendario, Retos, Grupos, Mensajes, Emancipación, Planes, Asistente, Intereses): cada una debe cargar sin pantalla en blanco.
-5. En **Asistente**, escribe una pregunta: sin sesión responde el asistente básico por reglas.
+5. En **Asistente**, escribe una pregunta: sin sesión responde el asistente básico por reglas. El botón **🔊 Escuchar** no aparece: un aviso explica que la voz necesita iniciar sesión.
 6. Al final de la página, pulsa **Borrar mis datos** para volver a empezar.
 
 ### 6.2 Prueba con cuenta (nube)
@@ -166,7 +181,8 @@ Al abrir la app desde `localhost` o `file://`, el asistente prueba primero ese s
 4. **Aislamiento:** la segunda cuenta **no** debe ver el perfil, los gastos ni otros grupos de la primera.
 5. **Ayudas → Catálogo oficial:** con sesión iniciada aparece el listado (hay una ayuda por cada fila del CSV, 14 ahora) con filtro por estado y enlace a la convocatoria. Sin sesión pide iniciar sesión.
 6. **Asistente:** con sesión, pregunta algo como "¿puedo permitirme salir a cenar hoy?". Responde Claude usando tu presupuesto.
-7. **Mensajes:** envía un recordatorio de dinero a un amigo. Un mensaje irrespetuoso o ajeno al dinero debe rechazarse.
+7. **Voz:** en esa respuesta, pulsa **🔊 Escuchar**. El botón pasa a «Generando voz…», empieza a sonar, cambia a «Detener» y aparece la etiqueta «Voz generada por IA». Pulsa otra vez para pararlo. Después activa «Leer en voz alta las respuestas nuevas» y haz otra pregunta: la respuesta se lee sola. Si la voz de IA no está disponible, se oye la voz del navegador con el aviso «Voz del navegador».
+8. **Mensajes:** envía un recordatorio de dinero a un amigo. Un mensaje irrespetuoso o ajeno al dinero debe rechazarse.
 
 ### 6.3 Pruebas técnicas
 | Comprobación | Cómo | Resultado esperado |
@@ -175,6 +191,16 @@ Al abrir la app desde `localhost` o `file://`, el asistente prueba primero ese s
 | Datos del catálogo | `python scripts/csv_a_sql.py` | `OK: 14 ayudas volcadas en sql/becas_ayudas.sql` (o el error con la fila exacta) |
 | Compilación | `npm install && npm run build` | Termina sin errores y crea `dist/index.html` |
 | Repetir los SQL | Volver a ejecutar `seguridad.sql` o `becas_ayudas.sql` | Sin errores y sin datos duplicados |
+| Voz: texto que se lee en alto | `python -m http.server 8000` y abrir `http://localhost:8000/scripts/test_voz.html` | `OK: 29 pruebas superadas` |
+| Voz: ruta `/tts` de `server.py` | `python scripts/test_tts_server.py` (sin red ni claves: Supabase y ElevenLabs simulados) | `Ran 10 tests` … `OK` |
+| Voz: función `tts` publicada | `curl` de abajo con un token de sesión | Se guarda `prueba.mp3` y se oye; sin token, error 401 |
+
+Para el `curl`, entra en la app y copia tu token de sesión desde la consola del navegador (F12): `JSON.parse(localStorage.getItem('sb-TU_REF-auth-token')).access_token`. `SB_KEY` es la clave *publishable* de `index.html`.
+```bash
+curl -X POST "https://TU_REF.supabase.co/functions/v1/tts" \
+  -H "Authorization: Bearer $TOKEN" -H "apikey: $SB_KEY" -H "Content-Type: application/json" \
+  -d '{"text":"Hola, soy la voz de Studentia."}' --output prueba.mp3
+```
 
 ### 6.4 Problemas frecuentes
 - **El asistente dice "no hay servidor de IA":** no está desplegada la función `chat` ni arrancado `server.py`, o falta `ANTHROPIC_API_KEY` (ver 4.2 y 4.3).
@@ -182,6 +208,10 @@ Al abrir la app desde `localhost` o `file://`, el asistente prueba primero ese s
 - **No entra con el email recién creado:** si *Confirm email* está activado, confirma primero el correo.
 - **Pantalla en blanco al abrir `index.html`:** sírvelo con `python -m http.server 8000` y recarga con Ctrl+F5.
 - **Vercel falla con `vite: Permission denied`:** la carpeta `node_modules` no debe estar en el repositorio (está en `.gitignore`).
+- **No aparece el botón 🔊 Escuchar:** la voz necesita la sesión iniciada.
+- **Se oye la voz del navegador (aviso «Voz del navegador»):** la voz de IA no está disponible. Falta publicar la función `tts` o poner los secretos `ELEVENLABS_*` (ver 4.4), la cuenta de ElevenLabs no tiene créditos (en los logs de la función aparece `quota_exceeded`), se ha pasado el límite de 20 audios cada 10 minutos o ElevenLabs ha tardado más de 15 s.
+- **«Este navegador no tiene ninguna voz en español»:** instala una voz en español en el sistema (Windows: *Configuración → Hora e idioma → Voz*; macOS: *Accesibilidad → Contenido leído*) o usa otro navegador.
+- **En el móvil sale «Toca para escuchar»:** Safari (iOS) bloquea el audio que no sale de un toque. Pulsa el botón y sonará.
 
 ---
 
@@ -193,6 +223,7 @@ Al abrir la app desde `localhost` o `file://`, el asistente prueba primero ese s
 - **Integridad:** el pagador de un gasto y su reparto deben ser del mismo grupo; hay límites de longitud para evitar basura.
 - **Catálogo de becas:** solo lectura y solo con sesión; nadie puede modificarlo desde la app o la API.
 - **Secretos:** la clave de Claude vive solo como secreto de la Edge Function (o en `.env`, ignorado por Git). No subas nunca un `.env` real.
+- **Voz (ElevenLabs):** la clave y el ID de la voz solo viven en el servidor (secretos de la función `tts` o `.env`). La función exige sesión, solo admite `{ text }` de hasta 700 caracteres y limita a 20 audios cada 10 minutos por usuario. Solo se envía el texto de la respuesta del asistente, nunca tu perfil ni tus mensajes, y la app lo avisa junto al control.
 - **Regla de oro:** toda tabla nueva necesita RLS y una política (`enable row level security` + `create policy`) antes de usarse.
 
 ---
@@ -204,9 +235,12 @@ index.html                  La aplicación completa (HTML + CSS + JS, sin compil
 server.py                   Servidor local opcional para el chat con Claude
 ordenador/requirements.txt  Dependencias de server.py
 supabase/functions/chat/    Edge Function del asistente (la clave de Claude vive solo aquí)
+supabase/functions/tts/     Edge Function de la voz (la clave de ElevenLabs vive solo aquí)
 sql/                        Esquema, retos, amigos, catálogo de becas y seguridad (+ verificador)
 datos/becas_y_ayudas.csv    Fuente de datos del catálogo de becas
 scripts/csv_a_sql.py        Convierte el CSV en SQL para Supabase
+scripts/test_voz.html       Pruebas del texto que se lee en voz alta (textoParaVoz)
+scripts/test_tts_server.py  Pruebas de la ruta /tts de server.py (sin red ni claves)
 .github/workflows/          Publicación automática de la web y de la función
 .env.example                Plantilla de variables de entorno (sin secretos)
 package.json                Vite (opcional): servidor de desarrollo y build
