@@ -1,5 +1,5 @@
-# Actualiza la función del chat en Supabase cuando cambias supabase/functions/**
-name: Publicar función del chat
+# Actualiza las funciones del asistente en Supabase (chat y voz) cuando cambias supabase/functions/**
+name: Publicar funciones del asistente (chat y voz)
 
 on:
   push:
@@ -19,5 +19,7 @@ jobs:
       - uses: supabase/setup-cli@v1
         with:
           version: latest
-      # La función comprueba por sí misma que quien escribe tiene la sesión iniciada
+      # Cada función comprueba por sí misma que quien llama tiene la sesión iniciada
       - run: supabase functions deploy chat --project-ref "$PROJECT_REF" --no-verify-jwt
+      # Voz del asistente (ElevenLabs). Sus secretos se ponen aparte con "supabase secrets set" (ver README)
+      - run: supabase functions deploy tts --project-ref "$PROJECT_REF" --no-verify-jwt
