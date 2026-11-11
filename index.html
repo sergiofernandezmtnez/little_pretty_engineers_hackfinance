@@ -448,6 +448,7 @@ function fixState(){
   if(S.mode==='supervivencia'||S.mode==='rojo')S.mode='sos';
   if(!MODES[S.mode])S.mode='normal';
   if(!S.groups)S.groups=[];
+  if(!S.msgs)S.msgs=[];
   if(!S.locPeople)S.locPeople={};
   if(!S.ingExtra)S.ingExtra=[];
   if(!S.myRetos)S.myRetos=[];
@@ -1156,7 +1157,7 @@ function adviceHtml(){
 }
 
 
-var TABS=[['inicio','Inicio'],['ayudas','Ayudas'],['calendario','Calendario'],['retos','Retos'],['grupos','Grupos'],['emancipacion','Emancipación'],['planes','Planes'],['asistente','Asistente'],['intereses','Intereses']];
+var TABS=[['inicio','Inicio'],['ayudas','Ayudas'],['calendario','Calendario'],['retos','Retos'],['grupos','Grupos'],['mensajes','Mensajes'],['emancipacion','Emancipación'],['planes','Planes'],['asistente','Asistente'],['intereses','Intereses']];
 function curView(){var h=location.hash.slice(1);return VIEWS[h]?h:'inicio';}
 function fmt(t){return esc(t).replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').replace(/\n/g,'<br>');}
 function statusPill(m){return m.st==='ok'?'<span class="pill ok">En ritmo</span>':m.st==='warn'?'<span class="pill warn">Vas justo</span>':'<span class="pill bad">'+(m.budget<=0?'Sin margen':'Presupuesto agotado')+'</span>';}
@@ -1562,6 +1563,99 @@ function vPlanes(){
   '<div class="col" id="mi-out">'+adviceHtml()+'</div></div>';
 }
 
+/* ---------- mensajes (recordar lo que te deben) ---------- */
+var msgTo=null,msgDraft='',msgErr='',msgBusy=false;
+var MSG_WARN='Esta es una aplicación destinada a las finanzas, no puedes mandar mensajes inapropiados.';
+var MSG_BAD=('puta puto putas putos putada putamadre puton mierda mierdas joder jodete jodido jodida jodidos gilipollas gilipolla cabron cabrona cabrones capullo capulla capullos pendejo pendeja pendejos zorra zorro maricon marica mariconazo subnormal subnormales retrasado retrasada mongolo mongola imbecil imbeciles idiota idiotas estupido estupida estupidos tarado tarada culo culos teta tetas pene vagina polla pollas verga follar follame follando follo sexo sexual porno pornografia mamada mamon mamona nazi hdp ptm ctm fuck fucking fucker shit bitch asshole dick cunt pussy slut whore bastard').split(' ');
+var msgCol=function(w){return w.replace(/(.)\1+/g,'$1');};
+var MSG_BADSET={};MSG_BAD.forEach(function(w){MSG_BADSET[msgCol(w)]=1;});
+function msgLeet(w){return w.replace(/0/g,'o').replace(/1/g,'i').replace(/3/g,'e').replace(/4/g,'a').replace(/5/g,'s').replace(/7/g,'t').replace(/\$/g,'s').replace(/@/g,'a');}
+/* Devuelve true si el mensaje es inapropiado (insultos, amenazas, contenido sexual, spam o "chorradas") */
+function msgBlocked(raw){
+  var t=String(raw||'').trim();
+  if(!t)return true;
+  var low=t.toLowerCase();
+  if(/coñ/.test(low))return true;
+  var n=norm(low);
+  if((n.match(/[a-z]/g)||[]).length<3)return true;                 /* solo símbolos, emojis o números */
+  if(/(.)\1{4,}/.test(n))return true;                              /* aaaaaa, !!!!!!! */
+  if(/\b(te (voy a|vamos a|iba a) (matar|pegar|reventar|romper|destrozar)|te mato|te reviento|muerete|ojala te mueras|ojala te mueras)\b/.test(n))return true;
+  var toks=n.split(/[^a-z0-9@$]+/).filter(function(x){return x&&/[a-z@$]/.test(x);});
+  if(!toks.length)return true;
+  var runs=n.match(/\b(?:[a-z0-9@$][\s.\-_*]+){2,}[a-z0-9@$]\b/g)||[];       /* p u t a, p.u.t.a */
+  for(var r=0;r<runs.length;r++){var j=msgCol(msgLeet(runs[r].replace(/[\s.\-_*]+/g,'')));if(MSG_BADSET[j])return true;}
+  var seen={},laugh=0;
+  for(var i=0;i<toks.length;i++){
+    var w=toks[i];
+    var base=msgCol(msgLeet(w));
+    if(MSG_BADSET[base]||MSG_BADSET[msgCol(w)])return true;
+    if(/^(?:ja|je|ji|jo|ju|ha|he|hi|ho|ke|ki|xd|lol|lmao)+$/.test(w)&&w.length>=4||/^x+d+$/.test(w)||/^(lol)+$/.test(w))laugh++;
+    var letters=w.replace(/[^a-z]/g,'');
+    if(letters.length>=6&&(letters.match(/[aeiou]/g)||[]).length/letters.length<0.2)return true;   /* sdfghjk */
+    if(/asdf|qwert|zxcv|hjkl|sdfg|wasd|qaz|poiuy|lkjh/.test(letters))return true;
+    seen[w]=(seen[w]||0)+1;if(seen[w]>=3&&w.length>1)return true;                                   /* spam: la misma palabra 3 veces */
+  }
+  if(laugh===toks.length)return true;                                                               /* jajaja, xd */
+  return false;
+}
+var MSG_TOPIC='Esta es una aplicación destinada a las finanzas: solo puedes mandar mensajes relacionados con dinero, pagos o deudas (por ejemplo: «Iván, me debes 12,50 € de la cena»).';
+/* El mensaje debe hablar de dinero: una palabra financiera o una cantidad en euros */
+var MSG_FIN=/^(deb(es|o|e|emos|en|er|eis|ias?|ido|idos|ida|idas)|deuda|deudas|deudor|adeud\w*|dinero|dineros|euros?|cent(imo|imos)|pag(?!ina)\w*|bizum\w*|transfer\w*|cobr(ar|o|as|ame|arme|ado|amos)|cuenta|cuentas|gast\w+|importe|importes|cantidad|efectivo|tarjeta|banco|bancos|bancari\w+|factura\w*|recibo|recibos|alquiler|fianza|saldo|saldar|saldad\w+|reembols\w+|devolv\w+|devuelv\w+|devolucion|prestamo|prestamos|prestad\w+|prestar|cuota|cuotas|ahorr\w+|ticket|compra|compras|comprar|comprad\w+|gasolina|mensualidad|repart\w+|dividir|dividid\w+|plata|pelas|reparto|abon\w+|ingres\w+|sueldo|nomina)$/;
+function msgFinance(raw){
+  var s=String(raw||'');
+  if(/[€$£]|\d\s*(€|e\b|eur)/i.test(s))return true;
+  var toks=norm(s).split(/[^a-z0-9]+/).filter(Boolean);
+  for(var i=0;i<toks.length;i++){if(MSG_FIN.test(toks[i]))return true;}
+  return false;
+}
+function vMensajes(){
+  if(!S.msgs)S.msgs=[];
+  var people=[];S.msgs.forEach(function(m){if(people.indexOf(m.to)<0)people.push(m.to);});
+  if(msgTo&&people.indexOf(msgTo)<0)people.unshift(msgTo);
+  if(!msgTo&&people.length)msgTo=people[people.length-1];
+  var th=S.msgs.filter(function(m){return m.to===msgTo;});
+  var side='<div class="col"><section class="panel"><h2>Conversaciones<span class="num">'+people.length+'</span></h2>'+
+    (people.length?'<div class="chips">'+people.map(function(n){return '<button class="chip" data-act="msgSel" data-who="'+esc(n)+'" aria-pressed="'+(n===msgTo)+'">'+esc(n)+'</button>';}).join('')+'</div>':'<p class="hint">Todavía no has escrito a nadie.</p>')+
+    '<p class="hint">Los mensajes se guardan en este navegador. Para avisar a tu amigo de verdad, usa el botón de WhatsApp de cada mensaje.</p></section></div>';
+  var main;
+  if(!msgTo){
+    main='<section class="panel"><h2>Tus mensajes</h2><p class="hint">Aquí aparecerán tus recordatorios. Ve a <a href="#grupos">Grupos</a> y pulsa <strong>Recordar</strong> junto a quien te deba dinero.</p></section>';
+  }else{
+    var log=th.length?th.map(function(m){var d=new Date(m.ts);return '<div class="b u"><p>'+esc(m.t)+'</p><div class="acts"><small>'+pad(d.getHours())+':'+pad(d.getMinutes())+'</small><a class="btn sm" target="_blank" rel="noopener" href="https://wa.me/?text='+encodeURIComponent(m.t)+'">WhatsApp</a></div></div>';}).join(''):'<p class="hint">Aún no has enviado nada a '+esc(msgTo)+'. Revisa el mensaje y pulsa Enviar.</p>';
+    main='<section class="panel chatp"><h2>Mensaje para '+esc(msgTo)+'</h2><div id="chatlog" class="chat" role="log" aria-live="polite">'+log+'</div>'+
+      (msgErr?'<p class="hint neg" role="alert">'+esc(msgErr)+'</p>':'')+
+      '<form class="chatform" data-form="msg"><label class="sr" for="msg-in">Mensaje</label><input id="msg-in" autocomplete="off" maxlength="200" value="'+esc(msgDraft)+'" placeholder="Escribe tu recordatorio"><button class="btn primary" type="submit"'+(msgBusy?' disabled':'')+'>'+(msgBusy?'Revisando…':'Enviar')+'</button></form>'+
+      '<p class="hint">Solo se pueden enviar mensajes relacionados con las finanzas: dinero, pagos y deudas. Nada de insultos ni bromas.</p></section>';
+  }
+  return '<div><h1>Mensajes</h1><p class="sub">Recuerda a tus amigos lo que te deben, con un mensaje claro y amable.</p></div><div class="cols"><div class="col">'+main+'</div>'+side+'</div>';
+}
+/* Revisión de cada mensaje con IA (Edge Function «chat», modo moderar). true = OK, false = rechazado, null = no disponible */
+async function msgAI(txt){
+  try{
+    var ses=await sb.auth.getSession(),tok=ses.data.session.access_token;
+    var res=await fetch(SB_URL+'/functions/v1/chat',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+tok,apikey:SB_KEY},body:JSON.stringify({moderar:true,texto:txt})});
+    if(!res.ok)return null;
+    var j=await res.json();
+    return typeof j.ok==='boolean'?j.ok:null;
+  }catch(e){return null;}
+}
+async function msgSend(){
+  if(msgBusy)return;
+  var inp=$('#msg-in'),txt=(inp?inp.value:msgDraft).trim().slice(0,200);
+  msgDraft=txt;
+  if(!txt){msgErr='Escribe un mensaje antes de enviarlo.';render();return;}
+  if(msgBlocked(txt)){msgErr=MSG_WARN;render();toast(MSG_WARN,'bad');return;}
+  if(!msgFinance(txt)){msgErr=MSG_TOPIC;render();toast('Solo mensajes relacionados con las finanzas','bad');return;}
+  if(CL()){                                   /* con cuenta: la IA revisa cada mensaje */
+    msgBusy=true;msgErr='';render();
+    var ok=await msgAI(txt);
+    msgBusy=false;
+    if(ok===false){msgErr=MSG_TOPIC;render();toast('La IA ha rechazado el mensaje: solo se permiten mensajes de finanzas','bad');return;}
+  }
+  S.msgs.push({id:uid(),to:msgTo,t:txt,ts:Date.now()});
+  msgDraft='';msgErr='';save();render();toast('Mensaje enviado a '+msgTo+' (simulación)','ok');
+}
+
 /* asistente */
 function bubble(x){
   return '<div class="b'+(x.r==='u'?' u':'')+(x.alert?' alert':'')+'"><p>'+fmt(x.t)+'</p>'+((x.acts&&x.acts.length)?'<div class="acts">'+x.acts.map(function(a){return '<a class="btn sm" href="'+esc(a.h)+'"'+(a.ext?' target="_blank" rel="noopener"':'')+'>'+esc(a.l)+'</a>';}).join('')+'</div>':'')+'</div>';
@@ -1762,7 +1856,7 @@ function calculateIntereses() {
   document.getElementById('bar-int').style.width = intPct + '%';
 }
 
-var VIEWS={inicio:vInicio,ayudas:vAyudas,calendario:vCalendario,retos:vRetos,grupos:vGrupos,emancipacion:vEmancipacion,planes:vPlanes,asistente:vAsistente,intereses:vIntereses};
+var VIEWS={inicio:vInicio,ayudas:vAyudas,calendario:vCalendario,retos:vRetos,grupos:vGrupos,mensajes:vMensajes,emancipacion:vEmancipacion,planes:vPlanes,asistente:vAsistente,intereses:vIntereses};
 
 /* ---------- SOS ---------- */
 function openSOS(){
@@ -1805,6 +1899,7 @@ function render(keep){
   if(keep===false)window.scrollTo(0,0);else window.scrollTo(0,y);
   var c=$('#chatlog');if(c)c.scrollTop=c.scrollHeight;
   if(view==='intereses')setTimeout(calculateIntereses,50);
+  if(view==='mensajes'){var mi=$('#msg-in');if(mi&&msgDraft&&!msgErr){mi.focus();try{mi.setSelectionRange(mi.value.length,mi.value.length);}catch(e){}}}
 
 }
 
@@ -1889,7 +1984,8 @@ var ACT={
   gDel:function(el){if(CL()){cloudDo(function(){return sb.from('grupos').delete().eq('id',el.dataset.id);});return;}S.groups=S.groups.filter(function(x){return x.id!==el.dataset.id;});save();render();},
   gExpDel:function(el){if(CL()){cloudDo(function(){return sb.from('grupo_gastos').delete().eq('id',el.dataset.id);});return;}var g=S.groups.filter(function(x){return x.id===el.dataset.g;})[0];if(g){g.exp=g.exp.filter(function(e){return e.id!==el.dataset.id;});save();render();}},
   settle:function(el){if(CL()){var cg=cloud.groups.filter(function(x){return x.id===el.dataset.g;})[0];if(cg)cloudDo(function(){return sb.from('grupo_pagos').insert({grupo_id:cg.id,de_id:cg.ids[el.dataset.from],a_id:cg.ids[el.dataset.to],importe_cents:+el.dataset.c});},'Pago apuntado');return;}var g=S.groups.filter(function(x){return x.id===el.dataset.g;})[0];if(g){g.paid.push({from:el.dataset.from,to:el.dataset.to,amt:(+el.dataset.c)/100});save();render();toast('Pago apuntado','ok');}},
-  nudge:function(el){copy(el.dataset.t,'Toque a '+el.dataset.who+' enviado: mensaje copiado (simulación)');},
+  nudge:function(el){msgTo=el.dataset.who;msgDraft=el.dataset.who+', me debes dinero.';msgErr='';if(location.hash==='#mensajes')render(false);else location.hash='#mensajes';},
+  msgSel:function(el){msgTo=el.dataset.who;msgDraft='';msgErr='';render();},
   ask:function(el){send(el.dataset.q);},
   obStart:function(){D=blank();render(false);},
   example:function(){S.profile=exampleProfile();S.example=true;S.gastos=exampleGastos();S.ingExtra=exampleIngresos();S.mode='normal';S.modeMonth='';S.closed={};S.alerts={mes:'',hit:[]};S.chat=[];save();digest();location.hash='#inicio';render(false);},
@@ -1963,6 +2059,7 @@ document.addEventListener('click',function(e){
   var el=e.target.closest('[data-act]');if(!el)return;
   var f=ACT[el.dataset.act];if(f)f(el,e);
 });
+document.addEventListener('input',function(e){if(e.target&&e.target.id==='msg-in'){msgDraft=e.target.value;msgErr='';}});
 document.addEventListener('submit',function(e){
   var f=e.target.closest('form[data-form]');if(!f)return;e.preventDefault();
   var k=f.dataset.form;
@@ -1986,6 +2083,7 @@ document.addEventListener('submit',function(e){
   if(k==='addamigo'){var ac=$('#am-code').value.trim().toLowerCase();if(!ac){toast('Escribe el código de tu amigo','bad');return;}cloudDo(function(){return sb.rpc('pedir_amistad',{cod:ac,mi_nombre:S.profile.nombre});},'Solicitud enviada');return;}
   if(k==='joinreto'){var jr=$('#jr-code').value.trim().toLowerCase();if(!jr){toast('Escribe el código del reto','bad');return;}cloudDo(function(){return sb.rpc('unirse_reto',{cod:jr,mi_nombre:S.profile.nombre});},'Te has unido al reto');return;}
   if(k==='evento'){var t=$('#ev-title').value.trim(),dt=$('#ev-date').value;if(!t||!dt)return;S.events.push({id:uid(),title:t,date:dt,kind:$('#ev-kind').value,amt:num($('#ev-amt').value),guests:$('#ev-guests').value.trim().replace(/\s+/g,'')});calSel=dt;var p=parse(dt);calCur={y:p.getFullYear(),m:p.getMonth()};save();render();toast('Evento guardado','ok');}
+  if(k==='msg'){msgSend();return;}
   if(k==='auth'){cloudAuth('in',$('#au-mail').value.trim(),$('#au-pass').value);return;}
   if(k==='join'){var jc=$('#jn-code').value.trim().toLowerCase();cloudDo(function(){return sb.rpc('unirse_grupo',{cod:jc,mi_nombre:S.profile.nombre});},'Te has unido al grupo');return;}
   if(k==='grupo'){var fd=new FormData(f),gn=String(fd.get('name')||'').trim(),ms=fd.getAll('m').map(String),gx=String(fd.get('extra')||'').trim().slice(0,20);if(!gn){toast('Ponle un nombre al grupo','bad');return;}if(gx&&gx!==ME&&ms.indexOf(gx)<0)ms.push(gx);if(CL()){cloudNewGroup(gn.slice(0,40),ms);return;}var ng={id:uid(),name:gn.slice(0,40),members:[ME].concat(ms),exp:[],paid:[]};S.groups.push(ng);gSel=ng.id;save();render();toast('Grupo creado','ok');return;}
