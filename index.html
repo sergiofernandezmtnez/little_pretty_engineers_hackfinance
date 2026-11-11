@@ -327,7 +327,7 @@ function setPath(o,path,v){var k=path.split('.'),c=o;for(var i=0;i<k.length-1;i+
 function getPath(o,path){return path.split('.').reduce(function(a,k){return a==null?a:a[k];},o);}
 
 /* ---------- datos ---------- */
-var CATS={comida:{l:'Compra y comida',e:1},transporte:{l:'Transporte',e:1},estudios:{l:'Material y estudios',e:1},salud:{l:'Salud',e:1},fuera:{l:'Comer y beber fuera',e:0},ocio:{l:'Ocio y cultura',e:0},compras:{l:'Compras y ropa',e:0},otros:{l:'Otros',e:0}};
+var CATS={comida:{l:'Compra y comida',e:1},transporte:{l:'Transporte',e:1},estudios:{l:'Material y estudios',e:1},salud:{l:'Salud',e:1},fuera:{l:'Comer y beber fuera',e:0},ocio:{l:'Ocio y cultura',e:0},compras:{l:'Compras y ropa',e:0},otros:{l:'Otros',e:0},grupos:{l:'Pagos en grupos',e:1,sys:1}};
 var MODES={
   normal:{l:'Normal',lvl:1,tol:1.1,d:'Presupuesto normal con tu ahorro ya apartado.',f:['Límite diario con tu ahorro mensual ya apartado','Aviso cuando te quede el 50 %, 20 %, 10 % y 5 % del presupuesto','Al llegar al 5 % se activa solo el modo Fin de mes (SOS)','Ayudas ordenadas por lo bien que encajan contigo']},
   sos:{l:'Fin de mes (SOS)',lvl:5,tol:1,d:'Solo lo esencial hasta que acabe el mes. Se activa solo al quedarte el 5 %, o puedes activarlo tú para ahorrar más este mes.',f:['Los gastos no esenciales aparecen como congelados','Aviso cada vez que apuntas ocio, compras o comer fuera','Ayudas urgentes y gratuitas primero','Solo planes de ocio gratis','Vuelve a Normal solo cuando empieza el mes siguiente']}
@@ -486,18 +486,33 @@ var resetArmed=false;
 /* Cierra los meses pasados: lo que no gastaste pasa al mes siguiente y tu ahorro mensual va a tu plan */
 function closeMonths(){
   var p=S.profile;if(!p||!p.inicio)return false;
+  if(CL()&&!cloud.gOk)return false;   /* con sesión, espera a tener tus grupos para no cerrar un mes sin sus pagos */
   ensurePlanes();
   var cm=curMes(),k=p.inicio,carry=Math.max(0,+p.saldo||0),changed=false,guard=0;
   while(k<cm&&guard++<240){
     if(S.closed[k]){carry=S.closed[k].out;k=nextMes(k);continue;}
     var ing=sumObj(p.ingresos),fij=sumObj(p.gastos),ah=+p.ahorro||0;
-    var spent=S.gastos.filter(function(g){return g.fecha.indexOf(k)===0;}).reduce(function(a,g){return a+g.importe;},0);
-    var ex=extraDe(k),base=Math.max(0,ing-fij-ah)+ex,avail=base+carry,out=Math.round((avail-spent)*100)/100;   /* puede ser negativo: números rojos que se arrastran */
+    var gfk=grupoFlujo(k),spent=S.gastos.filter(function(g){return g.fecha.indexOf(k)===0;}).reduce(function(a,g){return a+g.importe;},0)+gfk.sOut;
+    var ex=extraDe(k)+gfk.sIn,base=Math.max(0,ing-fij-ah)+ex,avail=base+carry,out=Math.round((avail-spent)*100)/100;   /* puede ser negativo: números rojos que se arrastran */
     S.closed[k]={base:base,carryIn:carry,extra:ex,spent:Math.round(spent*100)/100,out:out,ahorro:ah};
     if(ah>0)S.misPlanes.forEach(function(q){if(q.aporte>0)q.saved=(q.saved||0)+q.aporte;});
     carry=out;changed=true;k=nextMes(k);
   }
   return changed;
+}
+/* Dinero real que mueves en tus grupos: lo que pagas tú (gastos y deudas que saldas) resta de tu mes; lo que te devuelven suma */
+function grupoFlujo(prefix){
+  var out=[],inn=[];
+  (gl()||[]).forEach(function(g){
+    (g.exp||[]).forEach(function(e){if(e.payer===ME&&e.date&&String(e.date).indexOf(prefix)===0)out.push({id:'g'+e.id,fecha:String(e.date).slice(0,10),cat:'grupos',importe:e.amt,concepto:e.what+' ('+g.name+')',grupo:1});});
+    (g.paid||[]).forEach(function(p){
+      if(!p.date||String(p.date).indexOf(prefix)!==0)return;
+      var d=String(p.date).slice(0,10);
+      if(p.from===ME)out.push({id:'p'+d+p.to,fecha:d,cat:'grupos',importe:p.amt,concepto:'Pago a '+p.to+' ('+g.name+')',grupo:1});
+      else if(p.to===ME)inn.push({fecha:d,importe:p.amt,concepto:p.from+' te devuelve ('+g.name+')'});
+    });
+  });
+  return {out:out,inn:inn,sOut:Math.round(out.reduce(function(a,x){return a+x.importe;},0)*100)/100,sIn:Math.round(inn.reduce(function(a,x){return a+x.importe;},0)*100)/100};
 }
 function extraDe(k){return Math.round((S.ingExtra||[]).filter(function(i){return i.fecha.indexOf(k)===0;}).reduce(function(a,i){return a+i.importe;},0)*100)/100;}
 /* media mensual de ingresos extra en los últimos 3 meses (solo cuenta los meses que llevas usando la app) */
@@ -517,8 +532,9 @@ function model(){
   var prefix=y+'-'+pad(mo+1);
   var mi=(S.ingExtra||[]).filter(function(i){return i.fecha.indexOf(prefix)===0;});
   var extra=Math.round(mi.reduce(function(a,i){return a+i.importe;},0)*100)/100;
-  var budget=base+carry+extra;
-  var mg=S.gastos.filter(function(g){return g.fecha.indexOf(prefix)===0;});
+  var gf=grupoFlujo(prefix),gOut=gf.sOut,gIn=gf.sIn;
+  var budget=base+carry+extra+gIn;
+  var mg=S.gastos.filter(function(g){return g.fecha.indexOf(prefix)===0;}).concat(gf.out);
   var spent=mg.reduce(function(a,g){return a+g.importe;},0);
   var today=ymd(now);
   var spentToday=mg.filter(function(g){return g.fecha===today;}).reduce(function(a,g){return a+g.importe;},0);
@@ -528,7 +544,7 @@ function model(){
   var ideal=budget*day/n;
   var st='ok';
   if(budget<=0||remaining<=0)st='bad';else if(spent>ideal*MODES[S.mode].tol)st='warn';
-  return {ingresos:ingresos,extra:extra,mi:mi,carry:carry,base:base,fijos:fijos,ahorro:ahorro,budget:budget,spent:spent,spentToday:spentToday,remaining:remaining,daysLeft:daysLeft,allowance:allowance,leftToday:leftToday,ideal:ideal,day:day,n:n,y:y,mo:mo,mg:mg,st:st,libre:ingresos-fijos};
+  return {ingresos:ingresos,extra:extra,gOut:gOut,gIn:gIn,mi:mi,carry:carry,base:base,fijos:fijos,ahorro:ahorro,budget:budget,spent:spent,spentToday:spentToday,remaining:remaining,daysLeft:daysLeft,allowance:allowance,leftToday:leftToday,ideal:ideal,day:day,n:n,y:y,mo:mo,mg:mg,st:st,libre:ingresos-fijos};
 }
 
 /* ---------- ayudas: encaje con el perfil ---------- */
@@ -837,16 +853,17 @@ async function cloudLoad(){
   await cloudLoadRetos();
   await cloudLoadRed();
   await cloudLoadMsgs();
-  var r=await sb.from('grupos').select('id,nombre,codigo,grupo_miembros(id,nombre,user_id),grupo_gastos(id,concepto,importe_cents,pagador_id,fecha,grupo_reparto(miembro_id)),grupo_pagos(de_id,a_id,importe_cents)').order('created_at');
-  if(r.error){cloud.err=r.error.message;return;}
+  var r=await sb.from('grupos').select('id,nombre,codigo,grupo_miembros(id,nombre,user_id),grupo_gastos(id,concepto,importe_cents,pagador_id,fecha,grupo_reparto(miembro_id)),grupo_pagos(de_id,a_id,importe_cents,fecha)').order('created_at');
+  if(r.error){cloud.err=r.error.message;cloud.gOk=true;return;}
   cloud.err='';
+  cloud.gOk=true;
   cloud.groups=r.data.map(function(g){
     var nm={},ids={},uids={};
     var used={};
     g.grupo_miembros.forEach(function(m){var n=(m.user_id&&m.user_id===cloud.user.id)?ME:m.nombre,k=n,c=1;while(used[k]){c++;k=n+' ('+c+')';}used[k]=1;nm[m.id]=k;ids[k]=m.id;if(m.user_id&&m.user_id!==cloud.user.id)uids[k]=m.user_id;});
     return {id:g.id,name:g.nombre,code:g.codigo,ids:ids,uids:uids,members:g.grupo_miembros.map(function(m){return nm[m.id];}).sort(function(a,b){return (b===ME)-(a===ME);}),
       exp:g.grupo_gastos.map(function(e){return {id:e.id,what:e.concepto,amt:e.importe_cents/100,payer:nm[e.pagador_id],split:e.grupo_reparto.map(function(x){return nm[x.miembro_id];}),date:e.fecha};}),
-      paid:g.grupo_pagos.map(function(p){return {from:nm[p.de_id],to:nm[p.a_id],amt:p.importe_cents/100};})};
+      paid:g.grupo_pagos.map(function(p){return {from:nm[p.de_id],to:nm[p.a_id],amt:p.importe_cents/100,date:p.fecha};})};
   });
 }
 async function loadCat(){
@@ -880,7 +897,7 @@ async function cloudAuth(mode,em,pw){
     var r=mode==='up'?await sb.auth.signUp({email:em,password:pw}):await sb.auth.signInWithPassword({email:em,password:pw});
     if(r.error)throw r.error;
     if(!r.data.session){toast('Revisa tu correo para confirmar la cuenta y vuelve a entrar','ok');return;}
-    cloud.user=r.data.user;await pullProfile();await cloudLoad();render(false);if(!S.profile)ACT.obStart();toast('Sesión iniciada','ok');
+    cloud.user=r.data.user;cloud.gOk=false;cloud.groups=[];await pullProfile();await cloudLoad();render(false);if(!S.profile)ACT.obStart();toast('Sesión iniciada','ok');
   }catch(e){console.error('Auth:',e);toast(authMsg(e),'bad');}
   finally{authBusy=false;}
 }
@@ -918,7 +935,7 @@ async function pullProfile(){
 }
 async function cloudInit(){
   if(!sb)return;
-  try{var r=await sb.auth.getSession();cloud.user=r.data.session?r.data.session.user:null;if(cloud.user){await pullProfile();await cloudLoad();}render();}catch(e){cloud.err=String(e.message||e);}
+  try{var r=await sb.auth.getSession();cloud.user=r.data.session?r.data.session.user:null;if(cloud.user){cloud.gOk=false;await pullProfile();await cloudLoad();}render();}catch(e){cloud.err=String(e.message||e);}
 }
 function cloudNewGroup(name,ms){
   var seen={};ms=ms.filter(function(n){if(n===ME||seen[n])return false;seen[n]=1;return true;});
@@ -1122,7 +1139,7 @@ function planStrip(a){
 function previewHtml(a){
   if(a.sinMargen||!(a.monthly>0))return '';
   var m=model(),pausar=a.cuts.filter(function(c){return c.sub;}).reduce(function(x,c){return x+c.cut;},0);
-  var base2=Math.max(0,m.ingresos-(m.fijos-pausar)-a.monthly),bud2=base2+m.carry+m.extra,left2=(bud2-(m.spent-m.spentToday))/m.daysLeft-m.spentToday;
+  var base2=Math.max(0,m.ingresos-(m.fijos-pausar)-a.monthly),bud2=base2+m.carry+m.extra+(m.gIn||0),left2=(bud2-(m.spent-m.spentToday))/m.daysLeft-m.spentToday;
   var applied=Math.round(+S.profile.ahorro||0)===a.monthly;
   var row=function(l,now,aft){return '<li><span>'+esc(l)+'</span><span class="num">'+(applied?eur(aft,2):eur(now,2)+' → <strong>'+eur(aft,2)+'</strong>')+'</span></li>';};
   return '<h3>'+(applied?'Así está tu Inicio con tus planes':'Así quedaría tu Inicio al aplicar los planes')+'</h3><ul class="list">'+row('Ahorro al mes (aparece en el pie)',m.ahorro,a.monthly)+row('Presupuesto del mes (ticket)',m.budget,bud2)+row('Hoy puedes gastar (ticket)',m.leftToday,left2)+'</ul>';
@@ -1183,7 +1200,7 @@ function ticketHtml(m){
   '<form data-form="tope" class="row" style="margin-top:8px"><label class="f grow"><span>Máximo que quieres gastar al día (€)</span><input name="v" type="number" inputmode="decimal" min="0" step="0.01" value="'+(tope>0?esc(tope):'')+'" placeholder="Sin máximo"></label><button class="btn sm" type="submit">Guardar</button></form>';
   return '<section class="ticket" aria-label="Resumen del mes">'+
   '<div class="tk-head"><span>Ticket de hoy</span><span>'+esc(d.toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'long'}))+'</span></div>'+
-  '<dl class="tk-lines">'+(m.carry<0?L('Arrastras de meses anteriores (números rojos)','− '+eur(-m.carry,2)):L('Ya tenías en la cuenta',eur(m.carry,2)))+L('+ Ingresos del mes',eur(m.ingresos))+(m.extra>0?L('+ Ingresos extra de este mes',eur(m.extra,2)):'')+L('− Gastos fijos',eur(m.fijos,2))+(m.ahorro>0?L('− Ahorro de tus planes',eur(m.ahorro)):'')+(neg?L('Ajuste: tus gastos superan tus ingresos','+ '+eur(m.fijos+m.ahorro-m.ingresos,2)):'')+L('= Disponible este mes',eur(m.budget,2),true)+L('− Gastado hasta hoy',eur(m.spent,2))+'</dl>'+
+  '<dl class="tk-lines">'+(m.carry<0?L('Arrastras de meses anteriores (números rojos)','− '+eur(-m.carry,2)):L('Ya tenías en la cuenta',eur(m.carry,2)))+L('+ Ingresos del mes',eur(m.ingresos))+(m.extra>0?L('+ Ingresos extra de este mes',eur(m.extra,2)):'')+(m.gIn>0?L('+ Te han devuelto en grupos',eur(m.gIn,2)):'')+L('− Gastos fijos',eur(m.fijos,2))+(m.ahorro>0?L('− Ahorro de tus planes',eur(m.ahorro)):'')+(neg?L('Ajuste: tus gastos superan tus ingresos','+ '+eur(m.fijos+m.ahorro-m.ingresos,2)):'')+L('= Disponible este mes',eur(m.budget,2),true)+L('− Gastado hasta hoy',eur(m.spent-(m.gOut||0),2))+(m.gOut>0?L('− Pagado en grupos',eur(m.gOut,2)):'')+'</dl>'+
   '<div class="tk-total"><span>Te quedan este mes</span><strong class="hl num">'+eur(m.remaining,2)+'</strong></div>'+
   '<div class="tk-foot">'+statusPill(m)+'<span>'+esc(line)+'</span></div>'+
   '<div style="border-top:1px dashed var(--muted);margin-top:14px;padding-top:10px">'+hoy+'</div>'+
@@ -1255,7 +1272,7 @@ function tkHtml(){
     '<p class="hint">'+(tk.amt?'He leído un total de <strong class="num">'+eur(tk.amt,2)+'</strong>. Compruébalo con tu ticket antes de restarlo.':'No he encontrado el total. Escríbelo tú.')+'</p>'+
     '<div class="qa-row">'+
     '<label class="f"><span>Importe (€)</span><input id="tk-amt" type="number" inputmode="decimal" step="0.01" min="0.01" required value="'+(tk.amt||'')+'"></label>'+
-    '<label class="f"><span>Categoría</span><select id="tk-cat">'+Object.keys(CATS).map(function(k){return '<option value="'+k+'"'+(k===tk.cat?' selected':'')+'>'+CATS[k].l+'</option>';}).join('')+'</select></label>'+
+    '<label class="f"><span>Categoría</span><select id="tk-cat">'+Object.keys(CATS).filter(function(k){return !CATS[k].sys;}).map(function(k){return '<option value="'+k+'"'+(k===tk.cat?' selected':'')+'>'+CATS[k].l+'</option>';}).join('')+'</select></label>'+
     '<label class="f grow"><span>Concepto</span><input id="tk-con" type="text" maxlength="40" value="'+esc(tk.con||'')+'"></label>'+
     '<label class="f"><span>Pago</span><select id="tk-pay"><option value="tarjeta"'+(tk.pay==='tarjeta'?' selected':'')+'>Tarjeta</option><option value="efectivo"'+(tk.pay==='efectivo'?' selected':'')+'>Efectivo</option></select></label>'+
     '<button class="btn primary" type="submit">Restar de mi dinero</button></div>'+
@@ -1277,7 +1294,7 @@ function quickAdd(m){
   :
   '<div class="qa-row">'+
   '<label class="f"><span>Importe (€)</span><input id="qa-amt" name="amt" type="number" inputmode="decimal" step="0.01" min="0.01" required placeholder="0,00"></label>'+
-  '<label class="f"><span>Categoría</span><select id="qa-cat" name="cat">'+Object.keys(CATS).map(function(k){return '<option value="'+k+'">'+CATS[k].l+'</option>';}).join('')+'</select></label>'+
+  '<label class="f"><span>Categoría</span><select id="qa-cat" name="cat">'+Object.keys(CATS).filter(function(k){return !CATS[k].sys;}).map(function(k){return '<option value="'+k+'">'+CATS[k].l+'</option>';}).join('')+'</select></label>'+
   '<label class="f grow"><span>Concepto</span><input id="qa-con" name="con" type="text" maxlength="40" placeholder="Café, apuntes, metro..."></label>'+
   '<label class="f"><span>Pago</span><select id="qa-pay" name="pay"><option value="tarjeta">Tarjeta</option><option value="efectivo">Efectivo</option></select></label>'+
   '<button class="btn primary" type="submit">Añadir</button></div>';
@@ -2132,7 +2149,7 @@ var ACT={
   gSel:function(el){gSel=el.dataset.id;render();},
   gDel:function(el){if(CL()){cloudDo(function(){return sb.from('grupos').delete().eq('id',el.dataset.id);});return;}S.groups=S.groups.filter(function(x){return x.id!==el.dataset.id;});save();render();},
   gExpDel:function(el){if(CL()){cloudDo(function(){return sb.from('grupo_gastos').delete().eq('id',el.dataset.id);});return;}var g=S.groups.filter(function(x){return x.id===el.dataset.g;})[0];if(g){g.exp=g.exp.filter(function(e){return e.id!==el.dataset.id;});save();render();}},
-  settle:function(el){if(CL()){var cg=cloud.groups.filter(function(x){return x.id===el.dataset.g;})[0];if(cg)cloudDo(function(){return sb.from('grupo_pagos').insert({grupo_id:cg.id,de_id:cg.ids[el.dataset.from],a_id:cg.ids[el.dataset.to],importe_cents:+el.dataset.c});},'Pago apuntado');return;}var g=S.groups.filter(function(x){return x.id===el.dataset.g;})[0];if(g){g.paid.push({from:el.dataset.from,to:el.dataset.to,amt:(+el.dataset.c)/100});save();render();toast('Pago apuntado','ok');}},
+  settle:function(el){if(CL()){var cg=cloud.groups.filter(function(x){return x.id===el.dataset.g;})[0];if(cg)cloudDo(function(){return sb.from('grupo_pagos').insert({grupo_id:cg.id,de_id:cg.ids[el.dataset.from],a_id:cg.ids[el.dataset.to],importe_cents:+el.dataset.c});},(el.dataset.from===ME||el.dataset.to===ME)?'Pago apuntado y reflejado en tu ticket':'Pago apuntado');return;}var g=S.groups.filter(function(x){return x.id===el.dataset.g;})[0];if(g){g.paid.push({from:el.dataset.from,to:el.dataset.to,amt:(+el.dataset.c)/100,date:ymd(new Date())});save();render();toast((el.dataset.from===ME||el.dataset.to===ME)?'Pago apuntado y reflejado en tu ticket':'Pago apuntado','ok');}},
   nudge:function(el){var u=el.dataset.uid||'';msgKey=u?'u:'+u:'n:'+el.dataset.who;msgName=el.dataset.who;msgDraft=el.dataset.who+', me debes dinero.';msgErr='';msgDelId=null;if(location.hash==='#mensajes')render(false);else location.hash='#mensajes';},
   msgSel:function(el){msgKey=el.dataset.key;msgName=el.dataset.name;msgDraft='';msgErr='';msgDelId=null;render();},
   msgDelAsk:function(el){msgDelId=el.dataset.id;render();},
@@ -2246,7 +2263,7 @@ document.addEventListener('submit',function(e){
   if(k==='auth'){cloudAuth('in',$('#au-mail').value.trim(),$('#au-pass').value);return;}
   if(k==='join'){var jc=$('#jn-code').value.trim().toLowerCase();cloudDo(function(){return sb.rpc('unirse_grupo',{cod:jc,mi_nombre:S.profile.nombre});},'Te has unido al grupo');return;}
   if(k==='grupo'){var fd=new FormData(f),gn=String(fd.get('name')||'').trim(),ms=fd.getAll('m').map(String),gx=String(fd.get('extra')||'').trim().slice(0,20);if(!gn){toast('Ponle un nombre al grupo','bad');return;}if(gx&&gx!==ME&&ms.indexOf(gx)<0)ms.push(gx);if(CL()){cloudNewGroup(gn.slice(0,40),ms);return;}var ng={id:uid(),name:gn.slice(0,40),members:[ME].concat(ms),exp:[],paid:[]};S.groups.push(ng);gSel=ng.id;save();render();toast('Grupo creado','ok');return;}
-  if(k==='gexp'){var fe=new FormData(f),ge=gl().filter(function(x){return x.id===f.dataset.g;})[0],ga=num(fe.get('amt')),gw=fe.getAll('w').map(String),gt=String(fe.get('what')||'').trim();if(!ge||!ga||!gw.length||!gt){toast('Escribe concepto, importe y con quién se reparte','bad');return;}if(CL()){cloudAddExp(ge,gt.slice(0,40),ga,String(fe.get('payer')),gw);return;}ge.exp.push({id:uid(),what:gt.slice(0,40),amt:ga,payer:String(fe.get('payer')),split:gw,date:ymd(new Date())});save();render();toast('Gasto añadido','ok');return;}
+  if(k==='gexp'){var fe=new FormData(f),ge=gl().filter(function(x){return x.id===f.dataset.g;})[0],ga=num(fe.get('amt')),gw=fe.getAll('w').map(String),gt=String(fe.get('what')||'').trim();if(!ge||!ga||!gw.length||!gt){toast('Escribe concepto, importe y con quién se reparte','bad');return;}if(CL()){cloudAddExp(ge,gt.slice(0,40),ga,String(fe.get('payer')),gw);return;}ge.exp.push({id:uid(),what:gt.slice(0,40),amt:ga,payer:String(fe.get('payer')),split:gw,date:ymd(new Date())});save();render();toast(String(fe.get('payer'))===ME?'Gasto añadido y descontado de tu ticket':'Gasto añadido','ok');return;}
   if(k==='chat'){var i=$('#chat-in');var v=i.value;i.value='';send(v);}
   if(k==='sub'){var sn=$('#sb-n').value.trim().slice(0,30),si=num($('#sb-imp').value),sd=parseInt($('#sb-dia').value,10);if(!sn||!si||!(sd>=1&&sd<=31)){toast('Escribe el servicio, el precio y el día de cobro (1-31)','bad');return;}var pp=S.profile;pp.subs.push({id:uid(),n:sn,imp:si,dia:sd});pp.gastos.suscripciones=subsSum(pp.subs);save();render();toast('Suscripción añadida: se cobra el día '+sd,'ok');}
 });
