@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Pruebas de textoParaVoz</title>
+<style>
+body{font:15px/1.5 system-ui,sans-serif;margin:24px auto;max-width:960px;padding:0 16px}
+code{background:#eef0f4;padding:1px 4px;border-radius:4px}
+#r{font-weight:700}#r.ok{color:#0a7a50}#r.ko{color:#c4231a}
+li{margin:6px 0}li.ko{color:#c4231a}li small{display:block;color:#555}
+</style></head><body>
+<h1>Pruebas de <code>textoParaVoz</code></h1>
+<p>Prueban la función de <code>index.html</code> que prepara el texto que se convierte en voz (ElevenLabs o la voz del navegador). Se extrae del <code>index.html</code> real y se ejecuta aislada, sin tocar tus datos.
+Ábrela con un servidor local desde la raíz del repositorio: <code>python -m http.server 8000</code> y <code>http://localhost:8000/scripts/test_voz.html</code>.</p>
+<p id="r" role="status">Cargando index.html…</p>
+<ol id="l"></ol>
+<script>
+var CASOS=[
+  ['Hoy puedes gastar **12,50 €**.','Hoy puedes gastar doce euros con cincuenta.'],
+  ['• Ahorra 35 €\n• Cocina en casa','Ahorra treinta y cinco euros. Cocina en casa.'],
+  ['Te queda 1 €','Te queda un euro.'],
+  ['Llevas 21 € y el 50 % del mes','Llevas veintiún euros y el cincuenta por ciento del mes.'],
+  ['Ahorra 1.234,56 € al año','Ahorra mil doscientos treinta y cuatro euros con cincuenta y seis al año.'],
+  ['Solo 0,50 €','Solo cincuenta céntimos.'],
+  ['Te quedan 487,04 € y 3,01 €','Te quedan cuatrocientos ochenta y siete euros con cuatro céntimos y tres euros con un céntimo.'],
+  ['Hoy: 24,35 €','Hoy: veinticuatro euros con treinta y cinco.'],
+  ['101 € y 100 € y 115 €','ciento un euros y cien euros y ciento quince euros.'],
+  ['31 € y 21.000 €','treinta y un euros y veintiún mil euros.'],
+  ['Te quedan 2.000 € para 15 días','Te quedan dos mil euros para 15 días.'],
+  ['1.000.000 €','un millón de euros.'],
+  ['Pagas 300 €/mes','Pagas trescientos euros al mes.'],
+  ['Gasto: -20 €','Gasto: menos veinte euros.'],
+  ['12 euros','doce euros.'],
+  ['Usa el 12,5 % de tu sueldo y el 50% del resto','Usa el doce coma cinco por ciento de tu sueldo y el cincuenta por ciento del resto.'],
+  ['Camina 10.000 pasos','Camina 10.000 pasos.'],
+  ['Mira https://example.com/x 🎉 ya','Mira ya.'],
+  ['[Becas MEC](https://www.becas.es) abiertas 👍🏽','Becas MEC abiertas.'],
+  ['Hola\n\n\nAdiós','Hola. Adiós.'],
+  ['## Consejos\n1. Ahorra\n2) Invierte poco','Consejos. Ahorra. Invierte poco.'],
+  ['¿Puedo?\n¡Sí!','¿Puedo? ¡Sí!'],
+  ['Bienvenido a STUD€NTIA','Bienvenido a Studentia.'],
+  ['Gasto & ahorro','Gasto y ahorro.'],
+  ['',''],
+  [null,'']
+];
+var LARGO1=new Array(41).join('Esta es una frase de prueba bastante larga. ');
+var LARGO2=new Array(201).join('palabra ');
+function prueba(f){
+  var fallos=0,l=document.getElementById('l');
+  function linea(ok,txt,det){var li=document.createElement('li');li.className=ok?'ok':'ko';li.textContent=(ok?'✔ ':'✘ ')+txt;if(det){var s=document.createElement('small');s.textContent=det;li.appendChild(s);}l.appendChild(li);if(!ok)fallos++;}
+  CASOS.forEach(function(c){var r=f(c[0]);linea(r===c[1],JSON.stringify(c[0])+' → '+JSON.stringify(r),r===c[1]?'':'esperado: '+JSON.stringify(c[1]));});
+  var a=f(LARGO1);linea(a.length<=600&&/\.$/.test(a),'Texto largo con frases: '+a.length+' caracteres, acaba en final de frase');
+  var b=f(LARGO2);linea(b.length<=601&&/…$/.test(b),'Texto largo sin puntos: '+b.length+' caracteres, acaba en «…»');
+  var c=f(LARGO1,120);linea(c.length<=120,'Tope configurable (120): '+c.length+' caracteres');
+  var r=document.getElementById('r');r.className=fallos?'ko':'ok';
+  r.textContent=fallos?fallos+' prueba(s) fallida(s)':'OK: '+l.children.length+' pruebas superadas';
+}
+fetch('../index.html').then(function(res){return res.text();}).then(function(src){
+  var m=src.match(/function textoParaVoz\(t,max\)\{[\s\S]*?\n\}/);
+  if(!m)throw new Error('no encuentro textoParaVoz en index.html');
+  prueba(new Function(m[0]+'\nreturn textoParaVoz;')());
+}).catch(function(e){var r=document.getElementById('r');r.className='ko';r.textContent='Error: '+e.message+' (¿la has abierto con un servidor local?)';});
+</script>
+</body></html>
