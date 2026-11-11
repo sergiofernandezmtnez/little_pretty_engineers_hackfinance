@@ -1703,7 +1703,7 @@ function vMensajes(){
 async function msgAI(txt){
   try{
     var ses=await sb.auth.getSession(),tok=ses.data.session.access_token;
-    var res=await fetch(SB_URL+'/functions/v1/chat',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+tok,apikey:SB_KEY},body:JSON.stringify({moderar:true,texto:txt})});
+    var res=await fetch(SB_URL+'/functions/v1/mensajes',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+tok,apikey:SB_KEY},body:JSON.stringify({moderar:true,texto:txt})});
     if(!res.ok)return null;
     var j=await res.json();
     return typeof j.ok==='boolean'?j.ok:null;
@@ -1713,7 +1713,7 @@ async function msgAI(txt){
 async function msgDeliver(para,txt){
   try{
     var ses=await sb.auth.getSession(),tok=ses.data.session.access_token;
-    var res=await fetch(SB_URL+'/functions/v1/chat',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+tok,apikey:SB_KEY},body:JSON.stringify({enviar:true,para:para,texto:txt})});
+    var res=await fetch(SB_URL+'/functions/v1/mensajes',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+tok,apikey:SB_KEY},body:JSON.stringify({enviar:true,para:para,texto:txt})});
     var j={};try{j=await res.json();}catch(_e){}
     if(res.ok&&j.ok)return {ok:true};
     if(j&&j.rechazado)return {ok:false,error:MSG_TOPIC};
