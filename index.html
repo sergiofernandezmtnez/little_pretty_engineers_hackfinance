@@ -67,6 +67,7 @@ input[type=range]{padding:0;border:0;background:none;accent-color:var(--accent)}
 .pill{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:999px;font:600 12px var(--f-body)}
 .pill.ok{background:var(--ok-soft);color:var(--ok)}
 .pill.warn{background:var(--warn-soft);color:var(--warn)}
+.list li.inv,.inv{display:grid !important;flex-direction:column;gap:8px;padding:14px 0;border-top:1px solid var(--line)}.inv:first-child{border-top:0}.inv-h{display:flex;justify-content:space-between;gap:8px;align-items:center;flex-wrap:wrap}.inv-g{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px}.inv-g span{display:grid;gap:2px}.inv-g small{color:var(--muted,#667);font-size:12px}.inv-r{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .pill.bad{background:var(--bad-soft);color:var(--bad)}
 .sw{display:flex;align-items:center;gap:10px;font-size:14px;cursor:pointer}
 .panel{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:18px;box-shadow:var(--shadow);display:grid;gap:12px;min-width:0}
@@ -1808,6 +1809,63 @@ function vOnboard(){
   '<div class="row">'+(st>0?'<button class="btn" data-act="obBack">Atrás</button>':'<button class="btn ghost" data-act="obCancel">Volver</button>')+(st<4?'<button class="btn primary" data-act="obNext">Siguiente</button>':'<button class="btn primary" data-act="obFinish">Terminar</button>')+'</div></div>';
 }
 
+
+/* ---------- Inversiones para estudiantes (datos informativos, nov 2026) ---------- */
+var INV_FECHA='11 de noviembre de 2026';
+var INVS=[
+ {id:'cta',n:'Cuenta remunerada',r:3.0,lo:3.0,hi:3.5,riesgo:'Muy bajo',cls:'ok',liq:'Inmediata',min:'Desde 1 €',
+  d:'Es como tu cuenta normal, pero te paga intereses cada día. Protegida por el Fondo de Garantía de Depósitos (100.000 € por persona y banco).',
+  nota:'Muchas ofertas son solo para clientes nuevos o por tiempo limitado (p. ej. Revolut 3,51 % TAE, Openbank 3,25 % durante 12 meses, Bankinter ~3 %).',
+  src:'Rankia: mejores cuentas remuneradas noviembre 2026',url:'https://www.rankia.com/blog/cuentas-corrientes/7544345-mejores-cuentas-remuneradas-noviembre-2026'},
+ {id:'dep',n:'Depósito a plazo fijo',r:3.25,lo:3.0,hi:3.45,riesgo:'Muy bajo',cls:'ok',liq:'Bloqueado hasta el vencimiento',min:'Suele pedir 100–10.000 €',
+  d:'Dejas el dinero quieto un tiempo (por ejemplo 12 meses) y sabes desde el primer día cuánto vas a cobrar. También cubierto por el Fondo de Garantía de Depósitos.',
+  nota:'Ejemplos: BluOr Bank 3,45 % TAE a 12 meses, Renault Bank 3,24 %, Deutsche Bank hasta 3,25 %. Si lo retiras antes, puedes perder intereses.',
+  src:'Rankia: bancos con mayor rentabilidad 2026',url:'https://www.rankia.com/blog/mejores-depositos/6077086-bancos-con-mayor-rentabilidad'},
+ {id:'let',n:'Letras del Tesoro (12 meses)',r:3.07,lo:2.8,hi:3.1,riesgo:'Muy bajo',cls:'ok',liq:'Se pueden vender antes en el mercado',min:'Desde 1.000 €',
+  d:'Prestas dinero al Estado español durante 6 o 12 meses y te lo devuelve con intereses. Cualquier residente puede comprarlas en el Banco de España o en su banco.',
+  nota:'En la subasta del 3 de noviembre de 2026 la rentabilidad a 12 meses fue del 3,068 %, la más alta desde julio de 2024. Tributan como rendimiento del capital mobiliario.',
+  src:'Finect: Letras del Tesoro a 12 meses, 3,068 %',url:'https://www.finect.com/usuario/eduardogarcia/articulos/la-rentabilidad-de-las-letras-del-tesoro-a-12-meses-x-al-x'},
+ {id:'idx',n:'Fondo indexado MSCI World',r:7,lo:-18,hi:9,riesgo:'Medio-alto',cls:'warn',liq:'Rápida (1–3 días), pero puede estar en pérdidas',min:'Desde 1 €',
+  d:'Compras un trocito de más de 1.300 empresas de 23 países desarrollados a la vez. Comisiones bajas (TER ~0,12 %) y vigilado por la CNMV. Solo tiene sentido si no vas a necesitar ese dinero en 5–10 años o más.',
+  nota:'La rentabilidad histórica ronda el 7–9 % anual, pero no está garantizada: en 2022 cayó un 18 % y en 2008 más de un 40 %. El 7 % de abajo es solo una hipótesis, no una promesa.',
+  src:'Finect: mejores fondos indexados MSCI World 2026',url:'https://www.finect.com/usuario/davidcarmona/articulos/3-fondos-como-el-fidelity-msci-world-que-ganan-hasta-un-12-a-5-anos'}
+];
+function invMoney(){
+  var a=0;try{a=Math.round(ahorroAcum()+(+S.profile.ahorro||0));}catch(e){}
+  return a>0?a:1000;
+}
+function invFmt(n){return new Intl.NumberFormat('es-ES',{style:'currency',currency:'EUR',maximumFractionDigits:0}).format(n);}
+function invFmtPct(n){return (n>0?'+':'')+String(n).replace('.',',')+' %';}
+function invRows(cap,yrs){
+  return INVS.map(function(o){
+    var fin=cap*Math.pow(1+o.r/100,yrs),gan=fin-cap;
+    var peor=o.id==='idx'?cap*Math.pow(1+o.lo/100,1):null;
+    var rate=o.id==='idx'?'~7 % anual (hipótesis)':String(o.r).replace('.',',')+' % TAE';
+    return '<li class="inv"><div class="inv-h"><strong>'+esc(o.n)+'</strong><span class="pill '+o.cls+'">Riesgo '+esc(o.riesgo.toLowerCase())+'</span></div>'+
+      '<p class="hint">'+esc(o.d)+'</p>'+
+      '<div class="inv-g"><span><small>Rentabilidad</small><b>'+esc(rate)+'</b></span><span><small>Dinero disponible</small><b>'+esc(o.liq)+'</b></span><span><small>Mínimo</small><b>'+esc(o.min)+'</b></span></div>'+
+      '<div class="inv-r"><span>Con '+invFmt(cap)+' en '+yrs+(yrs===1?' año':' años')+':</span> <b class="num">'+invFmt(fin)+'</b> <span class="pill ok">'+(gan>=0?'+':'')+invFmt(gan)+'</span>'+
+      (peor!==null?' <span class="pill bad">Un mal año ('+invFmtPct(o.lo)+'): '+invFmt(peor)+'</span>':'')+'</div>'+
+      '<p class="hint">'+esc(o.nota)+' <a href="'+o.url+'" target="_blank" rel="noopener noreferrer">Fuente: '+esc(o.src)+'</a></p></li>';
+  }).join('');
+}
+function invUpdate(){
+  var box=document.getElementById('inv-list');if(!box)return;
+  var cap=Math.max(0,parseFloat(document.getElementById('inv-cap').value)||0);
+  var yrs=Math.max(1,Math.min(40,parseInt(document.getElementById('inv-yrs').value,10)||1));
+  box.innerHTML=invRows(cap,yrs);
+}
+function vInversiones(){
+  var cap=invMoney();
+  return '<section class="panel" id="inversiones" style="margin-top:20px"><h2>Dónde poner tu dinero siendo estudiante</h2>'+
+  '<p class="sub">Opciones ordenadas de menos a más riesgo. Pon cuánto tienes y mira qué podría pasar con cada una. Datos de '+INV_FECHA+' (España).</p>'+
+  '<div class="form-g"><label class="f"><span>Dinero disponible (€)'+(cap!==1000?' · calculado con tu ahorro':'')+'</span><input type="number" id="inv-cap" value="'+cap+'" min="0" step="50"></label>'+
+  '<label class="f"><span>Durante (años)</span><select id="inv-yrs"><option value="1">1 año</option><option value="3">3 años</option><option value="5" selected>5 años</option><option value="10">10 años</option></select></label></div>'+
+  '<ul class="list inv-list" id="inv-list">'+invRows(cap,5)+'</ul>'+
+  '<div class="verdict warn" style="margin-top:12px"><h3>Antes de invertir</h3><p>Primero ten un colchón de 3–6 meses de gastos en una cuenta con disponibilidad inmediata. El dinero que puedas necesitar en menos de 5 años no debería ir a un fondo de bolsa.</p></div>'+
+  '<p class="hint" style="margin-top:8px">Información orientativa y educativa, no es asesoramiento financiero. Las rentabilidades cambian a menudo y muchas ofertas son solo para clientes nuevos; comprueba las condiciones en la web oficial antes de contratar. Los cálculos usan interés compuesto, sin impuestos ni comisiones, y para Letras y depósitos suponen que renuevas al mismo tipo. Rentabilidades pasadas no garantizan las futuras.</p></section>';
+}
+
 function vIntereses() {
   return `<div><h1>Descubre los <span class="hl">Intereses Bancarios</span>.</h1>
   <p class="sub">Aprende cómo crece tu dinero o cuánto te cuesta pedirlo prestado.</p></div>
@@ -1910,10 +1968,11 @@ function vIntereses() {
         </div>
       </section>
     </div>
-  </div>`;
+  </div>${vInversiones()}`;
 }
 
 function calculateIntereses() {
+  invUpdate();
   var capInput = document.getElementById('sim-cap');
   if (!capInput) return;
   var cap = parseFloat(capInput.value) || 0;
@@ -2202,12 +2261,12 @@ function onInput(e){
   if(el.dataset.sim){var s=simInit(),k=el.dataset.sim;if(k==='bono')s.bono=el.checked;else if(k==='tipo'){s.tipo=el.value;s.tope=el.value==='habitacion'?300:600;var tp=$('#sm-tope');if(tp)tp.value=s.tope;}else if(k==='n'){s.n=+el.value;$('#sm-n-o').textContent=s.n;}else s[k]=num(el.value);save();$('#sim-out').innerHTML=simOut();}
 }
 document.addEventListener('input',function(e){onInput(e); var el=e.target;
-  if(el.id==='sim-cap'||el.id==='sim-rate'||el.id==='sim-years'){calculateIntereses();}
+  if(el.id==='sim-cap'||el.id==='sim-rate'||el.id==='sim-years'||el.id==='inv-cap'){calculateIntereses();}
 });
 document.addEventListener('change',function(e){
   var el=e.target;
   
-  if(el.id==='sim-type'){calculateIntereses();}
+  if(el.id==='sim-type'||el.id==='inv-yrs'){calculateIntereses();}
   if(el.id==='tk-file'){var fl=el.files&&el.files[0];el.value='';tkScan(fl);return;}
   if(el.dataset.bind){setPath(S,el.dataset.bind,el.checked);save();render();}
   if(el.dataset.plan){var d=PLANES.filter(function(p){return p.id===el.dataset.plan;})[0],i=planInfo(d),st=S.plans[d.id]||{on:false,target:i.target,months:i.months,saved:i.saved},k=el.dataset.k;st[k]=num(el.value);S.plans[d.id]=st;if(k==='precio')st.target=d.def();if(k==='months'&&S.profile.objetivo===d.id)S.profile.plazo=st.months;save();render();}
