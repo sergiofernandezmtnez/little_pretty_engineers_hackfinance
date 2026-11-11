@@ -6,6 +6,7 @@ on:
     branches: [main, master]
     paths:
       - 'supabase/functions/**'
+      - '.github/workflows/deploy-function.yml'
   workflow_dispatch:
 
 jobs:
@@ -19,7 +20,8 @@ jobs:
       - uses: supabase/setup-cli@v1
         with:
           version: latest
+      # --yes: la CLI pide confirmación y en GitHub Actions no hay nadie para darla
       # Cada función comprueba por sí misma que quien llama tiene la sesión iniciada
-      - run: supabase functions deploy chat --project-ref "$PROJECT_REF" --no-verify-jwt
+      - run: supabase functions deploy chat --project-ref "$PROJECT_REF" --no-verify-jwt --yes
       # Voz del asistente (ElevenLabs). Sus secretos se ponen aparte con "supabase secrets set" (ver README)
-      - run: supabase functions deploy tts --project-ref "$PROJECT_REF" --no-verify-jwt
+      - run: supabase functions deploy tts --project-ref "$PROJECT_REF" --no-verify-jwt --yes
