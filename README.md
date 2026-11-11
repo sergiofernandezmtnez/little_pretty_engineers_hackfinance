@@ -210,6 +210,7 @@ curl -X POST "https://TU_REF.supabase.co/functions/v1/tts" \
 - **Vercel falla con `vite: Permission denied`:** la carpeta `node_modules` no debe estar en el repositorio (está en `.gitignore`).
 - **No aparece el botón 🔊 Escuchar:** la voz necesita la sesión iniciada.
 - **Se oye la voz del navegador (aviso «Voz del navegador»):** la voz de IA no está disponible. Falta publicar la función `tts` o poner los secretos `ELEVENLABS_*` (ver 4.4), la cuenta de ElevenLabs no tiene créditos (en los logs de la función aparece `quota_exceeded`), se ha pasado el límite de 20 audios cada 10 minutos o ElevenLabs ha tardado más de 15 s.
+- **En los logs sale `missing_permissions` (falta el permiso `text_to_speech`):** la clave de ElevenLabs está limitada y no tiene permiso de texto a voz. Edítala en <https://elevenlabs.io/app/settings/api-keys> y activa *Text to Speech*, o crea otra con ese permiso. Si cambias de clave, actualiza el secreto o reinicia `server.py`.
 - **«Este navegador no tiene ninguna voz en español»:** instala una voz en español en el sistema (Windows: *Configuración → Hora e idioma → Voz*; macOS: *Accesibilidad → Contenido leído*) o usa otro navegador.
 - **En el móvil sale «Toca para escuchar»:** Safari (iOS) bloquea el audio que no sale de un toque. Pulsa el botón y sonará.
 
