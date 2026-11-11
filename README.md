@@ -181,7 +181,7 @@ Al abrir la app desde `localhost` o `file://`, el asistente y la voz prueban pri
 4. **Aislamiento:** la segunda cuenta **no** debe ver el perfil, los gastos ni otros grupos de la primera.
 5. **Ayudas → Catálogo oficial:** con sesión iniciada aparece el listado (hay una ayuda por cada fila del CSV, 14 ahora) con filtro por estado y enlace a la convocatoria. Sin sesión pide iniciar sesión.
 6. **Asistente:** con sesión, pregunta algo como "¿puedo permitirme salir a cenar hoy?". Responde Claude usando tu presupuesto.
-7. **Voz:** en esa respuesta, pulsa **🔊 Escuchar**. El botón pasa a «Generando voz…», empieza a sonar, cambia a «Detener» y aparece la etiqueta «Voz generada por IA». Pulsa otra vez para pararlo. Después activa «Leer en voz alta las respuestas nuevas» y haz otra pregunta: la respuesta se lee sola. Si la voz de IA no está disponible, se oye la voz del navegador con el aviso «Voz del navegador».
+7. **Voz:** en esa respuesta, pulsa **🔊 Escuchar**. El botón pasa a «Generando voz…», empieza a sonar, cambia a «Detener» y aparece la etiqueta «Voz generada por IA». Pulsa otra vez para pararlo. Después activa «Leer en voz alta las respuestas nuevas» y haz otra pregunta: la respuesta se lee sola (con la lectura automática, la IA contesta con frases cortas, pensadas para oírse). Si la voz de IA no está disponible, se oye la voz del navegador con el aviso «Voz del navegador».
 8. **Mensajes:** envía un recordatorio de dinero a un amigo. Un mensaje irrespetuoso o ajeno al dinero debe rechazarse.
 
 ### 6.3 Pruebas técnicas
@@ -213,6 +213,9 @@ curl -X POST "https://TU_REF.supabase.co/functions/v1/tts" \
 - **«Este navegador no tiene ninguna voz en español»:** instala una voz en español en el sistema (Windows: *Configuración → Hora e idioma → Voz*; macOS: *Accesibilidad → Contenido leído*) o usa otro navegador.
 - **En el móvil sale «Toca para escuchar»:** Safari (iOS) bloquea el audio que no sale de un toque. Pulsa el botón y sonará.
 
+### 6.5 Medición del impacto de la voz
+Con la sesión iniciada, `window.__voz()` en la consola del navegador devuelve contadores sin datos personales: reproducciones, tiempo desde el clic hasta el primer audio (mediana y p90), % de veces que se usó la voz del navegador y uso de la caché. `window.__voz.reset()` los pone a cero. El protocolo del mini-test de usabilidad (5 personas, 3 tareas con y sin voz) y las tablas para apuntar los resultados están en [`docs/medicion-voz.md`](docs/medicion-voz.md).
+
 ---
 
 ## 7. Seguridad
@@ -241,6 +244,7 @@ datos/becas_y_ayudas.csv    Fuente de datos del catálogo de becas
 scripts/csv_a_sql.py        Convierte el CSV en SQL para Supabase
 scripts/test_voz.html       Pruebas del texto que se lee en voz alta (textoParaVoz)
 scripts/test_tts_server.py  Pruebas de la ruta /tts de server.py (sin red ni claves)
+docs/medicion-voz.md        Protocolo y tablas para medir el impacto de la voz
 .github/workflows/          Publicación automática de la web y de la función
 .env.example                Plantilla de variables de entorno (sin secretos)
 package.json                Vite (opcional): servidor de desarrollo y build
