@@ -127,9 +127,10 @@ def tts():
     if not uid:
         return jsonify({"error": "Inicia sesión para escuchar las respuestas."}), 401
 
-    datos = request.get_json(silent=True)  # tiene que ser exactamente {"text": "..."}
-    if not isinstance(datos, dict) or set(datos) != {"text"} or not isinstance(datos["text"], str):
-        return jsonify({"error": "Petición no válida: se espera { text }."}), 400
+    datos = request.get_json(silent=True)  # {"text": "..."} y, opcional, "voz": "hombre" | "mujer" (por defecto, hombre)
+    if (not isinstance(datos, dict) or not isinstance(datos.get("text"), str) or not set(datos) <= {"text", "voz"}
+            or datos.get("voz", "hombre") not in ("hombre", "mujer")):
+        return jsonify({"error": "Petición no válida: se espera { text, voz? }."}), 400
     texto = datos["text"].strip()
     if not texto:
         return jsonify({"error": "No hay texto que leer."}), 400
@@ -138,9 +139,10 @@ def tts():
     if limitado(uid, _hits_tts, 20):  # 20 audios cada 10 minutos por usuario
         return jsonify({"error": "Has pedido muchos audios seguidos. Prueba en unos minutos."}), 429
 
-    clave, voz = os.getenv("ELEVENLABS_API_KEY"), os.getenv("ELEVENLABS_VOICE_ID")
+    var_voz = "ELEVENLABS_VOICE_ID_MUJER" if datos.get("voz") == "mujer" else "ELEVENLABS_VOICE_ID"
+    clave, voz = os.getenv("ELEVENLABS_API_KEY"), os.getenv(var_voz)
     if not clave or not voz:
-        app.logger.error("TTS: faltan ELEVENLABS_API_KEY o ELEVENLABS_VOICE_ID en .env")
+        app.logger.error("TTS: faltan ELEVENLABS_API_KEY o %s en .env", var_voz)
         return jsonify({"error": TTS_NO_DISPONIBLE}), 502
     modelo = os.getenv("ELEVENLABS_MODEL") or "eleven_flash_v2_5"
     cuerpo = {

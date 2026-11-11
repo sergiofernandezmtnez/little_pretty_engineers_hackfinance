@@ -1,6 +1,7 @@
 // Edge Function "tts": convierte en voz (ElevenLabs) el texto de una respuesta del asistente.
-// ELEVENLABS_API_KEY y ELEVENLABS_VOICE_ID viven solo aquí, como secretos de Supabase: nunca llegan al navegador.
-// Solo recibe el texto de la respuesta ({ text }); nunca el perfil ni los mensajes del usuario.
+// ELEVENLABS_API_KEY y los IDs de las voces (ELEVENLABS_VOICE_ID = hombre, ELEVENLABS_VOICE_ID_MUJER = mujer)
+// viven solo aquí, como secretos de Supabase: nunca llegan al navegador, que solo dice "hombre" o "mujer".
+// Solo recibe el texto de la respuesta ({ text, voz? }); nunca el perfil ni los mensajes del usuario.
 import { createClient } from "jsr:@supabase/supabase-js@2";
 
 const CORS = {
@@ -37,17 +38,19 @@ Deno.serve(async (req) => {
     const { data: { user } } = await sb.auth.getUser();
     if (!user) return json({ error: "Inicia sesión para escuchar las respuestas." }, 401);
 
-    // El cuerpo tiene que ser exactamente { text: string }
+    // El cuerpo tiene que ser { text: string } y, opcionalmente, voz: "hombre" | "mujer" (por defecto, hombre)
     const body = await req.json().catch(() => null);
-    const ok = body && typeof body === "object" && !Array.isArray(body) && Object.keys(body).length === 1 && typeof body.text === "string";
-    if (!ok) return json({ error: "Petición no válida: se espera { text }." }, 400);
+    const ok = body && typeof body === "object" && !Array.isArray(body) && typeof body.text === "string" &&
+      Object.keys(body).every((k) => k === "text" || k === "voz") && [undefined, "hombre", "mujer"].includes(body.voz);
+    if (!ok) return json({ error: "Petición no válida: se espera { text, voz? }." }, 400);
     const text = body.text.trim();
     if (!text) return json({ error: "No hay texto que leer." }, 400);
     if (text.length > MAX_CHARS) return json({ error: `El texto es demasiado largo (máximo ${MAX_CHARS} caracteres).` }, 400);
     if (limited(user.id)) return json({ error: "Has pedido muchos audios seguidos. Prueba en unos minutos." }, 429);
 
-    const key = Deno.env.get("ELEVENLABS_API_KEY"), voice = Deno.env.get("ELEVENLABS_VOICE_ID");
-    if (!key || !voice) { console.error("tts: faltan los secretos ELEVENLABS_API_KEY o ELEVENLABS_VOICE_ID"); return json({ error: NO_DISPONIBLE }, 502); }
+    const secretoVoz = body.voz === "mujer" ? "ELEVENLABS_VOICE_ID_MUJER" : "ELEVENLABS_VOICE_ID";
+    const key = Deno.env.get("ELEVENLABS_API_KEY"), voice = Deno.env.get(secretoVoz);
+    if (!key || !voice) { console.error(`tts: faltan los secretos ELEVENLABS_API_KEY o ${secretoVoz}`); return json({ error: NO_DISPONIBLE }, 502); }
     const model = Deno.env.get("ELEVENLABS_MODEL") || "eleven_flash_v2_5";
 
     let r: Response;

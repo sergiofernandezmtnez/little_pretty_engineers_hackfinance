@@ -1826,6 +1826,7 @@ function vozS(){
   if(!S.voz)S.voz={auto:false};
   /* medición del impacto: solo contadores y tiempos, sin textos ni datos personales (ver docs/medicion-voz.md) */
   if(!S.voz.m)S.voz.m={desde:ymd(new Date()),intentos:0,eleven:0,cache:0,nav:0,sinAudio:0,bloqueos:0,detenidas:0,completas:0,auto:0,lat:{eleven:[],cache:[],nav:[]}};
+  if(S.voz.voz!=='mujer')S.voz.voz='hombre';   /* voz elegida: «hombre» (clon de Adri, por defecto) o «mujer» (clon de Clara) */
   return S.voz;
 }
 function vozMide(k,ms){var m=vozS().m;if(ms===undefined){m[k]=(m[k]||0)+1;return;}var L=m.lat[k]||(m.lat[k]=[]);L.push(Math.round(ms));if(L.length>50)L.shift();}
@@ -1853,7 +1854,7 @@ function vozMsg(el){
 }
 function vozVis(){
   if(voz.st==='gen')return 'Generando voz…';
-  if(voz.st==='play')return voz.src==='nav'?'Leyendo con la voz del navegador.'+(voz.why?' '+voz.why:''):'Reproduciendo con voz generada por IA.';
+  if(voz.st==='play')return voz.src==='nav'?'Leyendo con la voz del navegador.'+(voz.why?' '+voz.why:''):'Reproduciendo con voz generada por IA (voz de '+vozS().voz+').';
   if(voz.st==='tap')return 'El navegador ha bloqueado el audio: pulsa «Toca para escuchar».';
   return voz.err;
 }
@@ -1863,7 +1864,9 @@ function vozPaint(){
 }
 function vozBar(){
   if(!vozOn())return '<p class="hint"><span aria-hidden="true">🔊</span> '+(sb?'<a href="#grupos">Inicia sesión</a> para escuchar las respuestas en voz alta (voz generada por IA).':'La lectura en voz alta necesita las cuentas en la nube (ver README).')+'</p>';
-  return '<div class="voz-bar"><div class="row"><span class="pill ok"><span aria-hidden="true">🔊</span> Voz generada por IA</span><label class="sw"><input type="checkbox" id="voz-auto"'+(vozS().auto?' checked':'')+'>Leer en voz alta las respuestas nuevas</label></div>'+
+  return '<div class="voz-bar"><div class="row"><span class="pill ok"><span aria-hidden="true">🔊</span> Voz generada por IA</span>'+
+  '<div class="seg" role="group" aria-label="Voz de la IA">'+['hombre','mujer'].map(function(v){return '<button type="button" class="seg-b" data-act="vozSel" data-v="'+v+'" aria-pressed="'+(vozS().voz===v)+'">'+(v==='hombre'?'Hombre':'Mujer')+'</button>';}).join('')+'</div>'+
+  '<label class="sw"><input type="checkbox" id="voz-auto"'+(vozS().auto?' checked':'')+'>Leer en voz alta las respuestas nuevas</label></div>'+
   '<p class="hint">Al usar la voz, el texto de la respuesta se envía a ElevenLabs para generar el audio; tus datos de perfil no se envían.</p><p class="hint" id="voz-vis">'+esc(vozVis())+'</p></div>';
 }
 function vozSilencio(){   /* 25 ms de silencio (WAV) para «desbloquear» el audio en Safari/iOS dentro del gesto del usuario */
@@ -1888,12 +1891,12 @@ function vozCachePut(k,u){   /* caché en memoria por hash del texto: máx. VOZ_
   voz.cache.delete(k);voz.cache.set(k,u);
   while(voz.cache.size>VOZ_CACHE){var fk=voz.cache.keys().next().value,fu=voz.cache.get(fk);voz.cache.delete(fk);if(!voz.audio||voz.audio.src!==fu)URL.revokeObjectURL(fu);}
 }
-async function vozFetch(txt){
+async function vozFetch(txt,k,vz){
   var ses=await sb.auth.getSession(),tok=ses&&ses.data&&ses.data.session?ses.data.session.access_token:'';
   if(!tok)throw vozE('Tu sesión ha caducado: vuelve a entrar para usar la voz de IA.',401);
   var ctl=voz.ctl=new AbortController(),tm=setTimeout(function(){ctl.abort();},VOZ_TIMEOUT);
   try{
-    var hd={'Content-Type':'application/json',Authorization:'Bearer '+tok,apikey:SB_KEY},body=JSON.stringify({text:txt}),res=null,urls=[];
+    var hd={'Content-Type':'application/json',Authorization:'Bearer '+tok,apikey:SB_KEY},body=JSON.stringify({text:txt,voz:vz}),res=null,urls=[];
     if(/^(localhost|127\.0\.0\.1)$/.test(location.hostname)||location.protocol==='file:')urls.push('http://127.0.0.1:5000/tts');
     urls.push(SB_URL+'/functions/v1/tts');
     for(var ui=0;ui<urls.length&&!res;ui++){try{res=await fetch(urls[ui],{method:'POST',headers:hd,body:body,signal:ctl.signal});}catch(e){if(ctl.signal.aborted)throw e;}}
@@ -1901,7 +1904,7 @@ async function vozFetch(txt){
     if(!res.ok){var j=await res.json().catch(function(){return {};});throw vozE(j.error||'La voz de IA no está disponible ahora.',res.status);}
     if(!/audio/i.test(res.headers.get('Content-Type')||''))throw vozE('La voz de IA no ha devuelto audio.');
     var blob=await res.blob();if(!blob.size)throw vozE('La voz de IA ha llegado vacía.');
-    var url=URL.createObjectURL(blob);vozCachePut(vozHash(txt),url);return url;
+    var url=URL.createObjectURL(blob);vozCachePut(k,url);return url;
   }finally{clearTimeout(tm);if(voz.ctl===ctl)voz.ctl=null;}
 }
 function vozSet(st,err){voz.st=st;if(err!==undefined)voz.err=err;vozPaint();}
@@ -1920,6 +1923,12 @@ function vozClick(el){
   if(x===voz.msg&&(voz.st==='gen'||voz.st==='play')){vozStop(true);return;}   /* pulsar otra vez = detener */
   vozSpeak(x,false);
 }
+function vozElegir(v){   /* selector «Hombre / Mujer»: se guarda por usuario y se actualiza sin render() */
+  if((v!=='hombre'&&v!=='mujer')||vozS().voz===v)return;
+  vozS().voz=v;save();
+  if(voz.st!=='idle')vozStop(false);   /* lo que suene con la otra voz se para */
+  $$('[data-act="vozSel"]').forEach(function(b){b.setAttribute('aria-pressed',String(b.dataset.v===v));});
+}
 async function vozSpeak(x,auto){
   vozStop(false);                                 /* empezar otro audio detiene el anterior */
   if(!auto)vozPrime();
@@ -1927,10 +1936,11 @@ async function vozSpeak(x,auto){
   if(!txt){vozSet('idle','Esta respuesta no tiene texto que leer.');return;}
   vozMide('intentos');if(auto)vozMide('auto');
   voz.msg=x;voz.txt=txt;voz.t0=performance.now();
-  url=voz.cache.get(vozHash(txt));
-  if(url){vozCachePut(vozHash(txt),url);vozPlay(url,seq,'cache');return;}   /* ya generada: sin red ni créditos */
+  var vz=vozS().voz,k=voz.key=vz+':'+vozHash(txt);   /* la caché distingue la voz de hombre y la de mujer */
+  url=voz.cache.get(k);
+  if(url){vozCachePut(k,url);vozPlay(url,seq,'cache');return;}   /* ya generada: sin red ni créditos */
   vozSet('gen');vozSay('Generando voz…');
-  try{url=await vozFetch(txt);}
+  try{url=await vozFetch(txt,k,vz);}
   catch(e){
     if(seq!==voz.seq)return;                      /* la han detenido o se ha pedido otra */
     var why=e&&e.voz?e.voz:e&&e.name==='AbortError'?'La voz de IA ha tardado demasiado.':'La voz de IA no está disponible ahora.';
@@ -1969,7 +1979,7 @@ function vozFail(msg){
   vozSet('idle',msg);vozSay(msg);toast(msg,'bad');
 }
 function vozAudioFail(){
-  var k=vozHash(voz.txt),u=voz.cache.get(k);if(u){voz.cache.delete(k);URL.revokeObjectURL(u);}   /* audio dañado: fuera de la caché */
+  var k=voz.key,u=voz.cache.get(k);if(u){voz.cache.delete(k);URL.revokeObjectURL(u);}   /* audio dañado: fuera de la caché */
   voz.aSeq=-1;vozNav(voz.txt,voz.seq,'No se ha podido reproducir el audio de IA.');
 }
 function vozVozES(){
@@ -2424,6 +2434,7 @@ var ACT={
   },
   ask:function(el){send(el.dataset.q);},
   speak:function(el){vozClick(el);},
+  vozSel:function(el){vozElegir(el.dataset.v);},
   obStart:function(){D=blank();render(false);},
   example:function(){S.profile=exampleProfile();S.example=true;S.gastos=exampleGastos();S.ingExtra=exampleIngresos();S.mode='normal';S.modeMonth='';S.closed={};S.alerts={mes:'',hit:[]};S.chat=[];save();digest();location.hash='#inicio';render(false);},
   obCancel:function(){D=null;render(false);},
