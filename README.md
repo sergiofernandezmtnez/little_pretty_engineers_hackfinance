@@ -211,6 +211,7 @@ curl -X POST "https://TU_REF.supabase.co/functions/v1/tts" \
 - **No aparece el botón 🔊 Escuchar:** la voz necesita la sesión iniciada.
 - **Se oye la voz del navegador (aviso «Voz del navegador»):** la voz de IA no está disponible. Falta publicar la función `tts` o poner los secretos `ELEVENLABS_*` (ver 4.4), la cuenta de ElevenLabs no tiene créditos (en los logs de la función aparece `quota_exceeded`), se ha pasado el límite de 20 audios cada 10 minutos o ElevenLabs ha tardado más de 15 s.
 - **En los logs sale `missing_permissions` (falta el permiso `text_to_speech`):** la clave de ElevenLabs está limitada y no tiene permiso de texto a voz. Edítala en <https://elevenlabs.io/app/settings/api-keys> y activa *Text to Speech*, o crea otra con ese permiso. Si cambias de clave, actualiza el secreto o reinicia `server.py`.
+- **En los logs sale `api_key_id_used_as_api_key`:** has pegado el *ID* de la clave, no la clave. Las claves empiezan por `sk_` y ElevenLabs solo las enseña al crearlas o regenerarlas: crea otra (con permiso de texto a voz) y cópiala en ese momento.
 - **«Este navegador no tiene ninguna voz en español»:** instala una voz en español en el sistema (Windows: *Configuración → Hora e idioma → Voz*; macOS: *Accesibilidad → Contenido leído*) o usa otro navegador.
 - **En el móvil sale «Toca para escuchar»:** Safari (iOS) bloquea el audio que no sale de un toque. Pulsa el botón y sonará.
 
