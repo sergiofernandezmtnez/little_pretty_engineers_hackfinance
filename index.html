@@ -374,7 +374,8 @@ var CATL={estudios:'Estudios',vivienda:'Vivienda',transporte:'Transporte',comida
 var AYUDAS=[
  {id:'mec',t:'Beca general del Ministerio',cat:'estudios',imp:'1.700 € por renta + 300 € básica (curso 2026-27)',val:2000,d:'Cuantías fijas y variable según tu renta y tus notas. Si vives fuera de casa por estudios, hasta 2.700 € más.',req:{estudios:['Bachillerato','FP','Grado','Máster']},plazo:'La convocatoria 2026-27 cerró el 18 de mayo de 2026. La siguiente suele abrirse en primavera.',cal:'2027-04-01',calL:'Revisa si se abre la beca MEC',pasos:['Pide el certificado de renta de tu familia','Ten a mano tu matrícula y tu expediente','Solicítala en la sede electrónica del Ministerio']},
  {id:'bono',t:'Bono Alquiler Joven',cat:'vivienda',imp:'250 € al mes durante un máximo de 2 años',val:3000,d:'Ayuda al alquiler para jóvenes de 18 a 35 años con ingresos por debajo de 3 veces el IPREM (unos 25.200 € brutos al año).',req:{edad:[18,35],ingresoMax:2100,vivienda:['piso']},plazo:'Depende de tu comunidad autónoma: comprueba si tiene la convocatoria abierta.',pasos:['Ten tu contrato de alquiler a nombre del solicitante','Reúne tu declaración de la renta o certificado de ingresos','Solicítala en la sede de vivienda de tu comunidad']},
- {id:'abono',t:'Abono Joven de transporte (Madrid)',cat:'transporte',imp:'Tarifa joven reducida (unos 20 € al mes)',val:400,d:'Abono mensual con tarifa joven en toda la Comunidad de Madrid.',req:{edad:[0,25],ccaa:['Comunidad de Madrid'],zona:'Comunidad de Madrid'},plazo:'Confirma el precio vigente en el Consorcio de Transportes.',pasos:['Haz la tarjeta de transporte público si no la tienes','Pide el abono joven en el Consorcio o en un estanco','Recárgalo cada mes']},
+ {id:'abono',t:'Abono Joven de transporte (Madrid)',cat:'transporte',imp:'10 € al mes (menores de 26 años)',val:400,d:'Abono mensual con tarifa joven en toda la Comunidad de Madrid: 10 € al mes para menores de 26 años.',req:{edad:[0,25],ccaa:['Comunidad de Madrid'],zona:'Comunidad de Madrid'},plazo:'Confirma el precio vigente en el Consorcio de Transportes.',pasos:['Haz la tarjeta de transporte público si no la tienes','Pide el abono joven en el Consorcio o en un estanco','Recárgalo cada mes']},
+ {id:'abonoJoven',t:'Abono de transporte joven (Cercanías y Renfe)',cat:'transporte',imp:'10 € al mes (menores de 26 años)',val:120,d:'Abono mensual ilimitado de Cercanías con tarifa joven: 10 € al mes en vez de 20 €. Hay que registrarse como joven antes de comprarlo.',req:{edad:[15,25]},plazo:'Se pide todo el año; el precio puede cambiar cada año, confírmalo en Renfe.',pasos:['Regístrate como joven en la web del Ministerio de Transportes','Compra el abono mensual en los canales de Renfe','Confirma el precio vigente en tu comunidad']},
  {id:'carne',t:'Carné Joven',cat:'cultura',imp:'Descuentos en cultura, ocio y viajes',val:0,d:'Tarjeta con descuentos en cines, museos, tiendas y transporte. Las ventajas dependen de tu comunidad.',req:{edad:[14,30],gusto:['cine','musica','viajes','lectura','deporte']},plazo:'Se tramita todo el año.',pasos:['Busca el carné de tu comunidad autónoma','Hazlo online con tu DNI','Revisa su catálogo de descuentos antes de pagar']},
  {id:'irpf',t:'Deducción por alquiler (IRPF Madrid)',cat:'vivienda',imp:'Hasta 1.000 € menos en tu declaración (orientativo)',val:1000,d:'Menores de 35 años que alquilan su vivienda habitual en la Comunidad de Madrid pueden deducir una parte del alquiler. Confirma los límites en la Agencia Tributaria.',req:{edad:[0,34],ccaa:['Comunidad de Madrid'],zona:'Comunidad de Madrid',vivienda:['piso']},plazo:'Se aplica en la campaña de la renta, cada primavera.',pasos:['Guarda los recibos o transferencias del alquiler','Anota la fianza depositada en tu comunidad','Marca la deducción al hacer la declaración']},
  {id:'garantia',t:'Garantía Juvenil',cat:'empleo',imp:'Formación, prácticas y ofertas de empleo',val:0,d:'Programa para jóvenes de 16 a 29 años que da acceso a formación y ofertas de trabajo.',req:{edad:[16,29]},plazo:'Inscripción abierta todo el año.',pasos:['Inscríbete en el sistema nacional de Garantía Juvenil','Pide cita en tu servicio de empleo','Revisa las ofertas que te asignen']},
@@ -439,7 +440,7 @@ var SUG=['¿Cuánto puedo gastar hoy?','¿Puedo gastarme 35 € en unas zapatill
 /* ---------- estado ---------- */
 var KEY='finmes.v1';
 var mem=null;
-function defaults(){return {profile:null,mode:'normal',groups:[],gastos:[],saved:[],discarded:[],hist:[],joined:{},events:[],plans:{},card:{blocked:false,auto:true,alertDaily:true,alertPct:true},chat:[],sim:null,ingExtra:[],myRetos:[],locPeople:{},retoHist:[],subsPausa:[],misPlanes:[],planesInit:false,lastDigest:'',example:false,flags:{},closed:{},alerts:{mes:'',hit:[]},modeMonth:''};}
+function defaults(){return {profile:null,mode:'normal',groups:[],gastos:[],saved:[],discarded:[],hist:[],joined:{},events:[],plans:{},card:{blocked:false,auto:true,alertDaily:true,alertPct:true},chat:[],sim:null,ingExtra:[],myRetos:[],locPeople:{},retoHist:[],subsPausa:[],misPlanes:[],planesInit:false,lastDigest:'',example:false,flags:{},closed:{},alerts:{mes:'',hit:[]},modeMonth:'',topeDia:0};}
 function load(){try{var r=localStorage.getItem(KEY);if(r)return JSON.parse(r);}catch(e){}return mem;}
 var curMes=function(){var t=new Date();return t.getFullYear()+'-'+pad(t.getMonth()+1);};
 var nextMes=function(k){var a=k.split('-').map(Number);a[1]++;if(a[1]>12){a[1]=1;a[0]++;}return a[0]+'-'+pad(a[1]);};
@@ -448,7 +449,6 @@ function fixState(){
   if(S.mode==='supervivencia'||S.mode==='rojo')S.mode='sos';
   if(!MODES[S.mode])S.mode='normal';
   if(!S.groups)S.groups=[];
-  if(!S.msgs)S.msgs=[];
   if(!S.locPeople)S.locPeople={};
   if(!S.ingExtra)S.ingExtra=[];
   if(!S.myRetos)S.myRetos=[];
@@ -714,6 +714,7 @@ function addGasto(amt,cat,con,pago){
   var m=model(),c=CATS[cat];
   if(lvl()>=3&&!c.e){toast('Modo '+MODES[S.mode].l+': este gasto no es esencial','bad');say('Has apuntado **'+eur(amt,2)+'** en "'+c.l+'". Estás en Modo '+MODES[S.mode].l+': intenta posponerlo.',true);}
   if(S.card.alertDaily&&m.leftToday<0&&before.leftToday>=0){toast('Has pasado tu límite de hoy','bad');say('Has superado tu límite de hoy en **'+eur(-m.leftToday,2)+'**. Mañana tu límite baja a **'+eur(Math.max(0,m.remaining)/Math.max(1,m.daysLeft-1),2)+'**.',true);}
+  if(+S.topeDia>0&&m.spentToday>S.topeDia&&before.spentToday<=S.topeDia){toast('Has superado tu máximo de hoy','bad');say('Has pasado el máximo que te pusiste para hoy ('+eur(S.topeDia,2)+') en **'+eur(m.spentToday-S.topeDia,2)+'**.',true);}
   checkAlerts(true);m=model();
   if(S.card.auto&&m.remaining<=0&&!S.card.blocked){S.card.blocked=true;save();toast('Presupuesto agotado: tarjeta bloqueada (simulación)','bad');say('Has agotado el presupuesto del mes y he **bloqueado tu tarjeta** (simulación). Puedes desbloquearla cuando quieras.',true);}
   render();
@@ -740,6 +741,7 @@ function bot(q){
   if(A!==null&&has('puedo','comprar','gastar','gastarme','me compro','vale la pena')){
     var non=has('cine','copas','fiesta','ropa','zapatillas','cerveza','concierto','videojuego','restaurante','capricho','salir','cena');
     if(lvl()>=3&&non)return {t:'Ahora mismo **no te lo recomiendo**: estás en Modo '+MODES[S.mode].l+' y eso no es esencial. Si lo quieres de verdad, espera a cobrar.'};
+    if(+S.topeDia>0&&A>S.topeDia-m.spentToday&&A<=m.leftToday)return {t:'Entra en tu presupuesto, pero **te pasarías de tu máximo de hoy** ('+eur(S.topeDia,2)+'): te quedan '+eur(Math.max(0,S.topeDia-m.spentToday),2)+' de ese máximo.'};
     if(A<=m.leftToday)return {t:'**Sí**, entra en tu límite de hoy. Te quedarían **'+eur(m.leftToday-A,2)+'** para hoy.'};
     if(A<=m.remaining){var np=(m.remaining-A)/Math.max(1,m.daysLeft-1);return {t:'Entra en el mes, pero **te pasas '+eur(A-m.leftToday,2)+'** de tu límite de hoy. Si lo compras, tu límite diario baja a **'+eur(np,2)+'** el resto del mes.'};}
     return {t:'**No**: supera lo que te queda del mes ('+eur(m.remaining,2)+'). Si es necesario, mira las ayudas de urgencia.',acts:[{l:'Ver ayudas',h:'#ayudas'}]};
@@ -938,7 +940,7 @@ function noEsenciales(m){return Math.round(m.mg.filter(function(g){return CATS[g
 function aiContext(){
   var m=model(),p=S.profile,r2=function(x){return Math.round((+x||0)*100)/100;},deu=[];
   gl().forEach(function(g){gDebts(g).forEach(function(d){if(d.to===ME)deu.push(d.from+' te debe '+r2(d.c/100)+' € ('+g.name+')');else if(d.from===ME)deu.push('Debes '+r2(d.c/100)+' € a '+d.to+' ('+g.name+')');});});
-  return {fecha:ymd(new Date()),nombre:p.nombre,edad:p.edad,estudios:p.estudios,comunidad_autonoma:p.ccaa||'',universidad:p.centro||'',ambito_estudios:AMB[p.ambito]||'',objetivo_ahorro:(S.misPlanes.length?S.misPlanes.map(nomPlan).join(', '):'Ahorro general'),vivienda:p.vivienda,gustos:p.gustos||[],modo:MODES[S.mode].l,ingresos_mes:r2(m.ingresos),ingresos_extra_este_mes:r2(m.extra),ultimos_ingresos_extra:(S.ingExtra||[]).slice(-5).map(function(i){return {fecha:i.fecha,tipo:i.tipo,importe:i.importe,concepto:i.concepto};}),gastos_fijos:r2(m.fijos),ahorro_mensual:r2(m.ahorro),presupuesto_variable_mes:r2(m.budget),gastado_este_mes:r2(m.spent),queda_este_mes:r2(m.remaining),dias_restantes:m.daysLeft,limite_hoy:r2(m.leftToday),ayudas_que_encajan:matchAll().slice(0,5).map(function(x){return {titulo:x.a.t,encaje_pct:x.score,plazo:x.a.plazo};}),deudas_en_grupos:deu,gasto_por_categoria:catSum(m),gasto_no_esencial_mes:noEsenciales(m),ultimos_gastos:S.gastos.slice(-6).map(function(g){return {fecha:g.fecha,cat:g.cat,importe:g.importe,concepto:g.concepto};}),eventos_proximos:(S.events||[]).filter(function(e){return e.date>=ymd(new Date());}).slice(0,5).map(function(e){return {titulo:e.title,fecha:e.date,importe:e.amt};}),planes_activos:PLANES.filter(function(pl){return S.plans[pl.id]&&S.plans[pl.id].on;}).map(function(pl){return pl.t;})};
+  return {fecha:ymd(new Date()),nombre:p.nombre,edad:p.edad,estudios:p.estudios,comunidad_autonoma:p.ccaa||'',universidad:p.centro||'',ambito_estudios:AMB[p.ambito]||'',objetivo_ahorro:(S.misPlanes.length?S.misPlanes.map(nomPlan).join(', '):'Ahorro general'),vivienda:p.vivienda,gustos:p.gustos||[],modo:MODES[S.mode].l,ingresos_mes:r2(m.ingresos),ingresos_extra_este_mes:r2(m.extra),ultimos_ingresos_extra:(S.ingExtra||[]).slice(-5).map(function(i){return {fecha:i.fecha,tipo:i.tipo,importe:i.importe,concepto:i.concepto};}),gastos_fijos:r2(m.fijos),ahorro_mensual:r2(m.ahorro),presupuesto_variable_mes:r2(m.budget),gastado_este_mes:r2(m.spent),queda_este_mes:r2(m.remaining),dias_restantes:m.daysLeft,limite_hoy:r2(m.leftToday),maximo_diario_elegido:r2(S.topeDia),ayudas_que_encajan:matchAll().slice(0,5).map(function(x){return {titulo:x.a.t,encaje_pct:x.score,plazo:x.a.plazo};}),deudas_en_grupos:deu,gasto_por_categoria:catSum(m),gasto_no_esencial_mes:noEsenciales(m),ultimos_gastos:S.gastos.slice(-6).map(function(g){return {fecha:g.fecha,cat:g.cat,importe:g.importe,concepto:g.concepto};}),eventos_proximos:(S.events||[]).filter(function(e){return e.date>=ymd(new Date());}).slice(0,5).map(function(e){return {titulo:e.title,fecha:e.date,importe:e.amt};}),planes_activos:PLANES.filter(function(pl){return S.plans[pl.id]&&S.plans[pl.id].on;}).map(function(pl){return pl.t;})};
 }
 async function aiAsk(text){
   S.chat.push({r:'a',t:'Pensando…',pending:true,acts:[]});render();
@@ -1157,7 +1159,7 @@ function adviceHtml(){
 }
 
 
-var TABS=[['inicio','Inicio'],['ayudas','Ayudas'],['calendario','Calendario'],['retos','Retos'],['grupos','Grupos'],['mensajes','Mensajes'],['emancipacion','Emancipación'],['planes','Planes'],['asistente','Asistente'],['intereses','Intereses']];
+var TABS=[['inicio','Inicio'],['ayudas','Ayudas'],['calendario','Calendario'],['retos','Retos'],['grupos','Grupos'],['emancipacion','Emancipación'],['planes','Planes'],['asistente','Asistente'],['intereses','Intereses']];
 function curView(){var h=location.hash.slice(1);return VIEWS[h]?h:'inicio';}
 function fmt(t){return esc(t).replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').replace(/\n/g,'<br>');}
 function statusPill(m){return m.st==='ok'?'<span class="pill ok">En ritmo</span>':m.st==='warn'?'<span class="pill warn">Vas justo</span>':'<span class="pill bad">'+(m.budget<=0?'Sin margen':'Presupuesto agotado')+'</span>';}
@@ -1168,11 +1170,20 @@ function ticketHtml(m){
   var line=m.budget<=0?(m.carry<0?'Arrastras números rojos de meses anteriores: este mes toca recuperarlos.':'Tus gastos fijos y tu ahorro ya se llevan todos tus ingresos.'):diff>=0?'Vas '+eur(diff,2)+' por debajo del ritmo ideal.':'Llevas '+eur(-diff,2)+' por encima del ritmo ideal.';
   var L=function(t,v,strong){return '<div><dt>'+(strong?'<strong>'+t+'</strong>':t)+'</dt><dd>'+(strong?'<strong>'+v+'</strong>':v)+'</dd></div>';};
   var neg=m.ingresos-m.fijos-m.ahorro<0;
+  var tope=+S.topeDia>0?+S.topeDia:0,topeLeft=tope-m.spentToday;
+  var hoyV=tope>0?Math.min(m.leftToday,topeLeft):m.leftToday;
+  var hoyTxt=hoyV<0?'− '+eur(-hoyV,2):eur(hoyV,2);
+  var hoyNota=tope>0?(topeLeft<m.leftToday?'Manda tu máximo: te quedan '+eur(Math.max(0,topeLeft),2)+' de los '+eur(tope,2)+' que quieres gastar hoy.':'Manda tu presupuesto: es menor que el máximo de '+eur(tope,2)+' que te has puesto.'):'Pon un máximo diario si quieres gastar menos de lo que te permite tu presupuesto.';
+  var hoy='<dl class="tk-lines">'+L('Gastado hoy',eur(m.spentToday,2))+(tope>0?L('Tu máximo para hoy',eur(tope,2)):'')+'</dl>'+
+  '<div class="tk-total"><span>Hoy puedes gastar</span><strong class="hl num">'+hoyTxt+'</strong></div>'+
+  '<p class="hint" style="margin:8px 0 0" role="status">'+esc(hoyNota)+'</p>'+
+  '<form data-form="tope" class="row" style="margin-top:8px"><label class="f grow"><span>Máximo que quieres gastar al día (€)</span><input name="v" type="number" inputmode="decimal" min="0" step="0.01" value="'+(tope>0?esc(tope):'')+'" placeholder="Sin máximo"></label><button class="btn sm" type="submit">Guardar</button></form>';
   return '<section class="ticket" aria-label="Resumen del mes">'+
   '<div class="tk-head"><span>Ticket de hoy</span><span>'+esc(d.toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'long'}))+'</span></div>'+
   '<dl class="tk-lines">'+(m.carry<0?L('Arrastras de meses anteriores (números rojos)','− '+eur(-m.carry,2)):L('Ya tenías en la cuenta',eur(m.carry,2)))+L('+ Ingresos del mes',eur(m.ingresos))+(m.extra>0?L('+ Ingresos extra de este mes',eur(m.extra,2)):'')+L('− Gastos fijos',eur(m.fijos,2))+(m.ahorro>0?L('− Ahorro de tus planes',eur(m.ahorro)):'')+(neg?L('Ajuste: tus gastos superan tus ingresos','+ '+eur(m.fijos+m.ahorro-m.ingresos,2)):'')+L('= Disponible este mes',eur(m.budget,2),true)+L('− Gastado hasta hoy',eur(m.spent,2))+'</dl>'+
   '<div class="tk-total"><span>Te quedan este mes</span><strong class="hl num">'+eur(m.remaining,2)+'</strong></div>'+
   '<div class="tk-foot">'+statusPill(m)+'<span>'+esc(line)+'</span></div>'+
+  '<div style="border-top:1px dashed var(--muted);margin-top:14px;padding-top:10px">'+hoy+'</div>'+
   '<p class="hint" style="margin:10px 0 0">Lo que no gastes se queda en tu cuenta y pasa al mes siguiente. Si te pasas, ese número rojo también pasa al mes siguiente y se resta de lo que ganes.</p>'+
   '<details style="margin-top:8px"><summary>Dinero que ya tienes en la cuenta</summary><form data-form="saldo" class="row"><label class="f grow"><span>Lo que tenías al empezar a usar la app (€)</span><input name="v" type="number" inputmode="decimal" min="0" step="0.01" value="'+(+p.saldo>0?esc(p.saldo):'')+'" placeholder="0"></label><button class="btn sm" type="submit">Guardar</button></form></details></section>';
 }
@@ -1394,6 +1405,7 @@ function vAyudas(){
   var fl=[['todas','Todas'],['urgentes','Urgentes y gratis']].concat(Object.keys(CATL).map(function(k){return [k,CATL[k]];}));
   var deck=q.length?(q[2]?'<div class="sc ghost" data-i="2"></div>':'')+(q[1]?'<div class="sc ghost" data-i="1"></div>':'')+swipeCard(q[0]):'<div class="sc"><h3>No quedan ayudas en este filtro</h3><p class="sc-d">Has revisado todas. Puedes volver a ver las que descartaste.</p><button class="btn primary" data-act="resetDisc">Volver a verlas</button></div>';
   return '<div><h1>Ayudas y ofertas</h1><p class="sub">Cruzamos tu edad, estudios, comunidad autónoma, universidad, ámbito, vivienda e ingresos con cada ayuda y ocultamos las que no son para ti. Desliza a la derecha para guardar y a la izquierda para descartar.</p></div>'+
+  (+S.profile.edad<26||!S.profile.edad?'<div class="banner" role="note"><span><strong>Recuerda:</strong> si tienes menos de 26 años, el abono de transporte joven cuesta <strong>10 € al mes</strong> (por ejemplo, Cercanías de Renfe y el Abono Joven de Madrid). El Abono Único estatal para jóvenes cuesta 30 €. Confirma siempre el precio en tu comunidad.</span></div>':'')+
   '<div class="chips" role="group" aria-label="Filtrar ayudas">'+fl.map(function(f){return '<button class="chip" data-act="ayFilter" data-v="'+f[0]+'" aria-pressed="'+(ayFilter===f[0])+'">'+f[1]+'</button>';}).join('')+'</div>'+
   '<div class="cols"><div class="col"><div class="deck" id="deck">'+deck+'</div>'+
   (q.length?'<div class="decide"><button class="btn danger" data-act="decide" data-v="l">Descartar</button><button class="btn" data-act="undoDecide"'+(S.hist.length?'':' disabled')+'>Deshacer</button><button class="btn primary" data-act="decide" data-v="r">Guardar</button></div><p class="hint" style="text-align:center">'+q.length+' por revisar. Los importes y plazos son orientativos: confirma siempre en la convocatoria oficial.</p>':'')+'</div>'+
@@ -1561,99 +1573,6 @@ function vPlanes(){
   return '<div><h1>Diseña tus planes de ahorro</h1><p class="sub">Crea tantos planes como quieras: dinos qué quieres conseguir, cuánto cuesta y en cuánto tiempo. Te decimos cuánto apartar cada mes y, si tu margen no llega, qué pagos poco importantes puedes quitar. Este contenido es informativo, no asesoramiento financiero.</p></div>'+
   '<div class="cols"><div class="col">'+cards+'<button type="button" class="btn primary" data-act="miAdd">+ Añadir otro plan</button><p class="hint">Los planes se guardan solos según escribes. Para que cuenten en tu presupuesto, pulsa «Aplicar» a la derecha.</p>'+pausedHtml()+'</div>'+
   '<div class="col" id="mi-out">'+adviceHtml()+'</div></div>';
-}
-
-/* ---------- mensajes (recordar lo que te deben) ---------- */
-var msgTo=null,msgDraft='',msgErr='',msgBusy=false;
-var MSG_WARN='Esta es una aplicación destinada a las finanzas, no puedes mandar mensajes inapropiados.';
-var MSG_BAD=('puta puto putas putos putada putamadre puton mierda mierdas joder jodete jodido jodida jodidos gilipollas gilipolla cabron cabrona cabrones capullo capulla capullos pendejo pendeja pendejos zorra zorro maricon marica mariconazo subnormal subnormales retrasado retrasada mongolo mongola imbecil imbeciles idiota idiotas estupido estupida estupidos tarado tarada culo culos teta tetas pene vagina polla pollas verga follar follame follando follo sexo sexual porno pornografia mamada mamon mamona nazi hdp ptm ctm fuck fucking fucker shit bitch asshole dick cunt pussy slut whore bastard').split(' ');
-var msgCol=function(w){return w.replace(/(.)\1+/g,'$1');};
-var MSG_BADSET={};MSG_BAD.forEach(function(w){MSG_BADSET[msgCol(w)]=1;});
-function msgLeet(w){return w.replace(/0/g,'o').replace(/1/g,'i').replace(/3/g,'e').replace(/4/g,'a').replace(/5/g,'s').replace(/7/g,'t').replace(/\$/g,'s').replace(/@/g,'a');}
-/* Devuelve true si el mensaje es inapropiado (insultos, amenazas, contenido sexual, spam o "chorradas") */
-function msgBlocked(raw){
-  var t=String(raw||'').trim();
-  if(!t)return true;
-  var low=t.toLowerCase();
-  if(/coñ/.test(low))return true;
-  var n=norm(low);
-  if((n.match(/[a-z]/g)||[]).length<3)return true;                 /* solo símbolos, emojis o números */
-  if(/(.)\1{4,}/.test(n))return true;                              /* aaaaaa, !!!!!!! */
-  if(/\b(te (voy a|vamos a|iba a) (matar|pegar|reventar|romper|destrozar)|te mato|te reviento|muerete|ojala te mueras|ojala te mueras)\b/.test(n))return true;
-  var toks=n.split(/[^a-z0-9@$]+/).filter(function(x){return x&&/[a-z@$]/.test(x);});
-  if(!toks.length)return true;
-  var runs=n.match(/\b(?:[a-z0-9@$][\s.\-_*]+){2,}[a-z0-9@$]\b/g)||[];       /* p u t a, p.u.t.a */
-  for(var r=0;r<runs.length;r++){var j=msgCol(msgLeet(runs[r].replace(/[\s.\-_*]+/g,'')));if(MSG_BADSET[j])return true;}
-  var seen={},laugh=0;
-  for(var i=0;i<toks.length;i++){
-    var w=toks[i];
-    var base=msgCol(msgLeet(w));
-    if(MSG_BADSET[base]||MSG_BADSET[msgCol(w)])return true;
-    if(/^(?:ja|je|ji|jo|ju|ha|he|hi|ho|ke|ki|xd|lol|lmao)+$/.test(w)&&w.length>=4||/^x+d+$/.test(w)||/^(lol)+$/.test(w))laugh++;
-    var letters=w.replace(/[^a-z]/g,'');
-    if(letters.length>=6&&(letters.match(/[aeiou]/g)||[]).length/letters.length<0.2)return true;   /* sdfghjk */
-    if(/asdf|qwert|zxcv|hjkl|sdfg|wasd|qaz|poiuy|lkjh/.test(letters))return true;
-    seen[w]=(seen[w]||0)+1;if(seen[w]>=3&&w.length>1)return true;                                   /* spam: la misma palabra 3 veces */
-  }
-  if(laugh===toks.length)return true;                                                               /* jajaja, xd */
-  return false;
-}
-var MSG_TOPIC='Esta es una aplicación destinada a las finanzas: solo puedes mandar mensajes relacionados con dinero, pagos o deudas (por ejemplo: «Iván, me debes 12,50 € de la cena»).';
-/* El mensaje debe hablar de dinero: una palabra financiera o una cantidad en euros */
-var MSG_FIN=/^(deb(es|o|e|emos|en|er|eis|ias?|ido|idos|ida|idas)|deuda|deudas|deudor|adeud\w*|dinero|dineros|euros?|cent(imo|imos)|pag(?!ina)\w*|bizum\w*|transfer\w*|cobr(ar|o|as|ame|arme|ado|amos)|cuenta|cuentas|gast\w+|importe|importes|cantidad|efectivo|tarjeta|banco|bancos|bancari\w+|factura\w*|recibo|recibos|alquiler|fianza|saldo|saldar|saldad\w+|reembols\w+|devolv\w+|devuelv\w+|devolucion|prestamo|prestamos|prestad\w+|prestar|cuota|cuotas|ahorr\w+|ticket|compra|compras|comprar|comprad\w+|gasolina|mensualidad|repart\w+|dividir|dividid\w+|plata|pelas|reparto|abon\w+|ingres\w+|sueldo|nomina)$/;
-function msgFinance(raw){
-  var s=String(raw||'');
-  if(/[€$£]|\d\s*(€|e\b|eur)/i.test(s))return true;
-  var toks=norm(s).split(/[^a-z0-9]+/).filter(Boolean);
-  for(var i=0;i<toks.length;i++){if(MSG_FIN.test(toks[i]))return true;}
-  return false;
-}
-function vMensajes(){
-  if(!S.msgs)S.msgs=[];
-  var people=[];S.msgs.forEach(function(m){if(people.indexOf(m.to)<0)people.push(m.to);});
-  if(msgTo&&people.indexOf(msgTo)<0)people.unshift(msgTo);
-  if(!msgTo&&people.length)msgTo=people[people.length-1];
-  var th=S.msgs.filter(function(m){return m.to===msgTo;});
-  var side='<div class="col"><section class="panel"><h2>Conversaciones<span class="num">'+people.length+'</span></h2>'+
-    (people.length?'<div class="chips">'+people.map(function(n){return '<button class="chip" data-act="msgSel" data-who="'+esc(n)+'" aria-pressed="'+(n===msgTo)+'">'+esc(n)+'</button>';}).join('')+'</div>':'<p class="hint">Todavía no has escrito a nadie.</p>')+
-    '<p class="hint">Los mensajes se guardan en este navegador. Para avisar a tu amigo de verdad, usa el botón de WhatsApp de cada mensaje.</p></section></div>';
-  var main;
-  if(!msgTo){
-    main='<section class="panel"><h2>Tus mensajes</h2><p class="hint">Aquí aparecerán tus recordatorios. Ve a <a href="#grupos">Grupos</a> y pulsa <strong>Recordar</strong> junto a quien te deba dinero.</p></section>';
-  }else{
-    var log=th.length?th.map(function(m){var d=new Date(m.ts);return '<div class="b u"><p>'+esc(m.t)+'</p><div class="acts"><small>'+pad(d.getHours())+':'+pad(d.getMinutes())+'</small><a class="btn sm" target="_blank" rel="noopener" href="https://wa.me/?text='+encodeURIComponent(m.t)+'">WhatsApp</a></div></div>';}).join(''):'<p class="hint">Aún no has enviado nada a '+esc(msgTo)+'. Revisa el mensaje y pulsa Enviar.</p>';
-    main='<section class="panel chatp"><h2>Mensaje para '+esc(msgTo)+'</h2><div id="chatlog" class="chat" role="log" aria-live="polite">'+log+'</div>'+
-      (msgErr?'<p class="hint neg" role="alert">'+esc(msgErr)+'</p>':'')+
-      '<form class="chatform" data-form="msg"><label class="sr" for="msg-in">Mensaje</label><input id="msg-in" autocomplete="off" maxlength="200" value="'+esc(msgDraft)+'" placeholder="Escribe tu recordatorio"><button class="btn primary" type="submit"'+(msgBusy?' disabled':'')+'>'+(msgBusy?'Revisando…':'Enviar')+'</button></form>'+
-      '<p class="hint">Solo se pueden enviar mensajes relacionados con las finanzas: dinero, pagos y deudas. Nada de insultos ni bromas.</p></section>';
-  }
-  return '<div><h1>Mensajes</h1><p class="sub">Recuerda a tus amigos lo que te deben, con un mensaje claro y amable.</p></div><div class="cols"><div class="col">'+main+'</div>'+side+'</div>';
-}
-/* Revisión de cada mensaje con IA (Edge Function «chat», modo moderar). true = OK, false = rechazado, null = no disponible */
-async function msgAI(txt){
-  try{
-    var ses=await sb.auth.getSession(),tok=ses.data.session.access_token;
-    var res=await fetch(SB_URL+'/functions/v1/chat',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+tok,apikey:SB_KEY},body:JSON.stringify({moderar:true,texto:txt})});
-    if(!res.ok)return null;
-    var j=await res.json();
-    return typeof j.ok==='boolean'?j.ok:null;
-  }catch(e){return null;}
-}
-async function msgSend(){
-  if(msgBusy)return;
-  var inp=$('#msg-in'),txt=(inp?inp.value:msgDraft).trim().slice(0,200);
-  msgDraft=txt;
-  if(!txt){msgErr='Escribe un mensaje antes de enviarlo.';render();return;}
-  if(msgBlocked(txt)){msgErr=MSG_WARN;render();toast(MSG_WARN,'bad');return;}
-  if(!msgFinance(txt)){msgErr=MSG_TOPIC;render();toast('Solo mensajes relacionados con las finanzas','bad');return;}
-  if(CL()){                                   /* con cuenta: la IA revisa cada mensaje */
-    msgBusy=true;msgErr='';render();
-    var ok=await msgAI(txt);
-    msgBusy=false;
-    if(ok===false){msgErr=MSG_TOPIC;render();toast('La IA ha rechazado el mensaje: solo se permiten mensajes de finanzas','bad');return;}
-  }
-  S.msgs.push({id:uid(),to:msgTo,t:txt,ts:Date.now()});
-  msgDraft='';msgErr='';save();render();toast('Mensaje enviado a '+msgTo+' (simulación)','ok');
 }
 
 /* asistente */
@@ -1856,7 +1775,7 @@ function calculateIntereses() {
   document.getElementById('bar-int').style.width = intPct + '%';
 }
 
-var VIEWS={inicio:vInicio,ayudas:vAyudas,calendario:vCalendario,retos:vRetos,grupos:vGrupos,mensajes:vMensajes,emancipacion:vEmancipacion,planes:vPlanes,asistente:vAsistente,intereses:vIntereses};
+var VIEWS={inicio:vInicio,ayudas:vAyudas,calendario:vCalendario,retos:vRetos,grupos:vGrupos,emancipacion:vEmancipacion,planes:vPlanes,asistente:vAsistente,intereses:vIntereses};
 
 /* ---------- SOS ---------- */
 function openSOS(){
@@ -1899,7 +1818,6 @@ function render(keep){
   if(keep===false)window.scrollTo(0,0);else window.scrollTo(0,y);
   var c=$('#chatlog');if(c)c.scrollTop=c.scrollHeight;
   if(view==='intereses')setTimeout(calculateIntereses,50);
-  if(view==='mensajes'){var mi=$('#msg-in');if(mi&&msgDraft&&!msgErr){mi.focus();try{mi.setSelectionRange(mi.value.length,mi.value.length);}catch(e){}}}
 
 }
 
@@ -1984,8 +1902,7 @@ var ACT={
   gDel:function(el){if(CL()){cloudDo(function(){return sb.from('grupos').delete().eq('id',el.dataset.id);});return;}S.groups=S.groups.filter(function(x){return x.id!==el.dataset.id;});save();render();},
   gExpDel:function(el){if(CL()){cloudDo(function(){return sb.from('grupo_gastos').delete().eq('id',el.dataset.id);});return;}var g=S.groups.filter(function(x){return x.id===el.dataset.g;})[0];if(g){g.exp=g.exp.filter(function(e){return e.id!==el.dataset.id;});save();render();}},
   settle:function(el){if(CL()){var cg=cloud.groups.filter(function(x){return x.id===el.dataset.g;})[0];if(cg)cloudDo(function(){return sb.from('grupo_pagos').insert({grupo_id:cg.id,de_id:cg.ids[el.dataset.from],a_id:cg.ids[el.dataset.to],importe_cents:+el.dataset.c});},'Pago apuntado');return;}var g=S.groups.filter(function(x){return x.id===el.dataset.g;})[0];if(g){g.paid.push({from:el.dataset.from,to:el.dataset.to,amt:(+el.dataset.c)/100});save();render();toast('Pago apuntado','ok');}},
-  nudge:function(el){msgTo=el.dataset.who;msgDraft=el.dataset.who+', me debes dinero.';msgErr='';if(location.hash==='#mensajes')render(false);else location.hash='#mensajes';},
-  msgSel:function(el){msgTo=el.dataset.who;msgDraft='';msgErr='';render();},
+  nudge:function(el){copy(el.dataset.t,'Toque a '+el.dataset.who+' enviado: mensaje copiado (simulación)');},
   ask:function(el){send(el.dataset.q);},
   obStart:function(){D=blank();render(false);},
   example:function(){S.profile=exampleProfile();S.example=true;S.gastos=exampleGastos();S.ingExtra=exampleIngresos();S.mode='normal';S.modeMonth='';S.closed={};S.alerts={mes:'',hit:[]};S.chat=[];save();digest();location.hash='#inicio';render(false);},
@@ -2059,13 +1976,13 @@ document.addEventListener('click',function(e){
   var el=e.target.closest('[data-act]');if(!el)return;
   var f=ACT[el.dataset.act];if(f)f(el,e);
 });
-document.addEventListener('input',function(e){if(e.target&&e.target.id==='msg-in'){msgDraft=e.target.value;msgErr='';}});
 document.addEventListener('submit',function(e){
   var f=e.target.closest('form[data-form]');if(!f)return;e.preventDefault();
   var k=f.dataset.form;
   if(k==='gasto'){var a=num($('#qa-amt').value);if(!a){toast('Escribe un importe mayor que cero','bad');return;}addGasto(a,$('#qa-cat').value,$('#qa-con').value.trim(),$('#qa-pay').value);}
   if(k==='ticket'){var ta=num($('#tk-amt').value);if(!ta){toast('Escribe un importe mayor que cero','bad');return;}var tp=$('#tk-pay').value;if(!(S.card.blocked&&tp==='tarjeta'))tk={st:'idle'};addGasto(ta,$('#tk-cat').value,$('#tk-con').value.trim().slice(0,40),tp);return;}
   if(k==='ingreso'){var ia=num($('#qi-amt').value);if(!ia){toast('Escribe un importe mayor que cero','bad');return;}addIngreso(ia,$('#qi-tipo').value,$('#qi-con').value.trim());}
+  if(k==='tope'){var tv=Math.max(0,num(new FormData(f).get('v'))||0);S.topeDia=Math.round(tv*100)/100;save();render();toast(S.topeDia>0?'Máximo diario guardado: '+eur(S.topeDia,2):'Máximo diario quitado','ok');return;}
   if(k==='saldo'){var sv=num(new FormData(f).get('v')),pp=S.profile,sd=sv-(+pp.saldo||0);pp.saldo=sv;
     Object.keys(S.closed||{}).forEach(function(c){var x=S.closed[c];x.carryIn=Math.round(((x.carryIn||0)+sd)*100)/100;x.out=Math.round(((x.out||0)+sd)*100)/100;});
     save();render();toast('Dinero en cuenta actualizado','ok');return;}
@@ -2083,7 +2000,6 @@ document.addEventListener('submit',function(e){
   if(k==='addamigo'){var ac=$('#am-code').value.trim().toLowerCase();if(!ac){toast('Escribe el código de tu amigo','bad');return;}cloudDo(function(){return sb.rpc('pedir_amistad',{cod:ac,mi_nombre:S.profile.nombre});},'Solicitud enviada');return;}
   if(k==='joinreto'){var jr=$('#jr-code').value.trim().toLowerCase();if(!jr){toast('Escribe el código del reto','bad');return;}cloudDo(function(){return sb.rpc('unirse_reto',{cod:jr,mi_nombre:S.profile.nombre});},'Te has unido al reto');return;}
   if(k==='evento'){var t=$('#ev-title').value.trim(),dt=$('#ev-date').value;if(!t||!dt)return;S.events.push({id:uid(),title:t,date:dt,kind:$('#ev-kind').value,amt:num($('#ev-amt').value),guests:$('#ev-guests').value.trim().replace(/\s+/g,'')});calSel=dt;var p=parse(dt);calCur={y:p.getFullYear(),m:p.getMonth()};save();render();toast('Evento guardado','ok');}
-  if(k==='msg'){msgSend();return;}
   if(k==='auth'){cloudAuth('in',$('#au-mail').value.trim(),$('#au-pass').value);return;}
   if(k==='join'){var jc=$('#jn-code').value.trim().toLowerCase();cloudDo(function(){return sb.rpc('unirse_grupo',{cod:jc,mi_nombre:S.profile.nombre});},'Te has unido al grupo');return;}
   if(k==='grupo'){var fd=new FormData(f),gn=String(fd.get('name')||'').trim(),ms=fd.getAll('m').map(String),gx=String(fd.get('extra')||'').trim().slice(0,20);if(!gn){toast('Ponle un nombre al grupo','bad');return;}if(gx&&gx!==ME&&ms.indexOf(gx)<0)ms.push(gx);if(CL()){cloudNewGroup(gn.slice(0,40),ms);return;}var ng={id:uid(),name:gn.slice(0,40),members:[ME].concat(ms),exp:[],paid:[]};S.groups.push(ng);gSel=ng.id;save();render();toast('Grupo creado','ok');return;}
